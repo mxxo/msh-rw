@@ -1,0 +1,8 @@
+[package]
+name = "serde_msh"
+version = "0.1.0"
+authors = ["Max Orok <maxwellorok@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+serde = { version = "1", features = ["derive"] }
