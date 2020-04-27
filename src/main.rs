@@ -3,18 +3,8 @@ use msh_parser::*;
 fn main() {
     let msh = Msh2 {
         nodes: vec![
-            Point {
-                tag: 1,
-                x: 0.0,
-                y: 0.0,
-                z: 0.0,
-            },
-            Point {
-                tag: 2,
-                x: 1.0,
-                y: 0.0,
-                z: 0.0,
-            },
+            Point { tag: 1, x: 0.0, y: 0.0, z: 0.0, },
+            Point { tag: 2, x: 1.0, y: 0.0, z: 0.0, },
         ],
         elts: vec![MeshElt {
             tag: 1,

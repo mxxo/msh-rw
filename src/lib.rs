@@ -1,3 +1,6 @@
+//! Gmsh **`msh`** file parser.
+pub mod parser;
+
 pub type Tag = usize;
 
 #[derive(Debug, Copy, Clone)]
