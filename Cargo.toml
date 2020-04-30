@@ -7,3 +7,6 @@ edition = "2018"
 [dependencies]
 nom = "5.1.1"
 thiserror = "1.0.15"
+
+[dev-dependencies]
+insta = "0.16.0"
