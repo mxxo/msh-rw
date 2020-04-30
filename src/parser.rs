@@ -1,5 +1,5 @@
 use crate::*;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use thiserror::Error;
 
 use nom::*;
@@ -28,16 +28,24 @@ pub enum MshError {
         #[from]
         source: std::io::Error,
     },
+    #[error("Bad file header ({source:?})")]
+    Header {
+        #[from]
+        source: crate::parser::HeaderError,
+    },
 }
 
 pub type MshResult<T> = std::result::Result<T, MshError>;
 
 impl Msh2 {
     fn from_file(file: &PathBuf) -> MshResult<Msh2> {
-        let filestr = std::fs::read_to_string(&file).expect("IO error");
-        let input = parse_header(&filestr).unwrap();
-        std::dbg!(input);
-        todo!();
+        let filestr = std::fs::read_to_string(&file)?;
+        let header = parse_header(&filestr);
+        if let Err(e) = header {
+            let e: HeaderError = HeaderError::from(e.to_owned());
+            return Err(e.into());
+        };
+        todo!()
     }
 }
 
@@ -57,11 +65,8 @@ pub enum MshSizeT { FourBytes, EightBytes }
 
 // -- helper parsers
 
-// pub sp<char>, char!(' ')
-
 pub fn sp(input: &str) -> IResult<&str, &str> {
     tag(" ")(input)
-    //nom::character::complete::char(' ')(input)
 }
 
 // TODO: add many spaces terminated by eol
@@ -73,7 +78,7 @@ pub fn end_of_line(input: &str) -> IResult<&str, &str> {
     }
 }
 
-// named!(pub crlf, do_parse!(opt!(tag("\r")) >> (tag!("\n"))));
+/// Parse a `msh` file header.
 pub fn mesh_header(input: &str) -> IResult<&str, MshHeader> {
     do_parse!(input,
         tag!("$MeshFormat") >>
@@ -114,52 +119,6 @@ pub fn mesh_header(input: &str) -> IResult<&str, MshHeader> {
         })
     )
 }
-
-//named!(pub msh_header<&str, MshHeader>,
-//do_parse!(
-//    tag("$MeshFormat") >>
-//    end_of_line >>
-//    version: alt(tag("2.2") | tag("4.1")) >>
-//    sp >>
-//    binary: one_of("01") >>
-//    sp >>
-//    size_t: one_of("48") >>
-//    endian: opt(
-//        do_parse(
-//            sp >>
-//            int: le_i32 >>
-//            (Some(int))
-//        )
-//    ) >>
-//    end_of_line >>
-//    tag!("$EndMeshFormat") >>
-//    end_of_line >> (
-//        MshHeader {
-//            version: match version {
-//                "2.2" => MshFormat::V22,
-//                "4.1" => MshFormat::V41,
-//                _ => panic!(format!("bad version in mesh header: {}", version)),
-//            },
-//            storage: match binary {
-//                '0' => MshStorage::Ascii,
-//                '1' => match endian.unwrap() {
-//                    None => panic!("binary header missing endianness"),
-//                    Some(1) => MshStorage::BinaryLe,
-//                    Some(_) => MshStorage::BinaryBe,
-//                }
-//                _ => panic!(format!("bad storage flag {}, expected 0 (ascii) or 1 (binary)", binary)),
-//            },
-//            size_t: match size_t {
-//                '4' => MshSizeT::FourBytes,
-//                '8' => MshSizeT::EightBytes,
-//                _ => panic!(format!("bad size_t value: {}", size_t)),
-//            },
-//        }
-//    )
-//)
-//);
-
-use std::path::Path;
 
 fn check_header<P>(file: P) -> Result<MshHeader, HeaderError> where P: AsRef<Path> {
     use std::io::BufRead;
@@ -243,6 +202,7 @@ mod tests {
         path.push("bad-header.msh");
         assert_debug_snapshot!(check_header(&path));
     }
+
     //#[test]
     //fn empty_mesh() {
     //    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
