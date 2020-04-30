@@ -8,11 +8,25 @@ use nom::character::complete::line_ending;
 //use nom::number::complete::{double, le_i32};
 
 #[derive(Error, Debug)]
+pub enum HeaderError {
+    #[error("IO error ({source:?})")]
+    Io {
+        #[from]
+        source: std::io::Error,
+    },
+    #[error("header parse error ({source:?})")]
+    Parse {
+        #[from]
+        source: nom::Err<(String, nom::error::ErrorKind)>,
+    }
+}
+
+#[derive(Error, Debug)]
 pub enum MshError {
-    #[error("invalid header (expected {expected:?}, found {found:?})")]
-    InvalidHeader {
-        expected: String,
-        found: String,
+    #[error("IO error ({source:?})")]
+    Io {
+        #[from]
+        source: std::io::Error,
     },
 }
 
@@ -145,10 +159,30 @@ pub fn mesh_header(input: &str) -> IResult<&str, MshHeader> {
 //)
 //);
 
+use std::path::Path;
+
+fn check_header<P>(file: P) -> Result<MshHeader, HeaderError> where P: AsRef<Path> {
+    use std::io::BufRead;
+    // examine first 3-4 lines, instead of reading the whole file
+    // because binary files aren't utf8
+    let file = std::fs::File::open(file)?;
+    let mut reader = std::io::BufReader::new(file);
+    let mut buffer = String::new();
+
+    // TODO better header error here
+    for _ in 0..=3 {
+        reader.read_line(&mut buffer)?;
+    }
+    println!("{}", buffer);
+    let header = parse_header(&buffer);
+    match header {
+        Ok((_extra_text, header)) => Ok(header),
+        Err(err) => Err(err.to_owned().into()),
+    }
+}
+
 fn parse_header(input: &str) -> IResult<&str, MshHeader> {
-    let (input, /*(incomplete,*/ header) = mesh_header(input)?;
-    std::dbg!(header);
-    Ok((input, header))
+    Ok(mesh_header(input)?)
 }
 
 #[cfg(test)]
@@ -162,7 +196,7 @@ mod tests {
         path.push("props");
         path.push("v2");
         path.push("empty.msh");
-        assert_debug_snapshot!(parse_header(&std::fs::read_to_string(&path).unwrap()).unwrap().1);
+        assert_debug_snapshot!(check_header(&path).unwrap());
     }
 
     #[test]
@@ -201,6 +235,14 @@ mod tests {
         assert_debug_snapshot!(parse_header(&std::fs::read_to_string(&path).unwrap()).unwrap().1);
     }
 
+    #[test]
+    fn bad_header() {
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("props");
+        path.push("v2");
+        path.push("bad-header.msh");
+        assert_debug_snapshot!(check_header(&path));
+    }
     //#[test]
     //fn empty_mesh() {
     //    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
