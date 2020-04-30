@@ -5,6 +5,7 @@ use thiserror::Error;
 use nom::*;
 use nom::bytes::complete::tag;
 use nom::character::complete::line_ending;
+use nom::error::{context, VerboseError};
 //use nom::number::complete::{double, le_i32};
 
 #[derive(Error, Debug)]
@@ -14,10 +15,16 @@ pub enum HeaderError {
         #[from]
         source: std::io::Error,
     },
-    #[error("header parse error ({source:?})")]
+//    #[error("header parse error ({source})")]
+    //Parse {
+    //    #[from]
+    //    //source: nom::Err<(String, nom::error::ErrorKind)>,
+    //    //source: nom::Err<(VerboseError<String>, nom::error::VerboseErrorKind)>,
+    //    source: nom::Err<(VerboseError<String>, nom::error::VerboseErrorKind)>,
+    //}
+    #[error("header parse error:\n{trace}")]
     Parse {
-        #[from]
-        source: nom::Err<(String, nom::error::ErrorKind)>,
+        trace: String,
     }
 }
 
@@ -42,8 +49,9 @@ impl Msh2 {
         let filestr = std::fs::read_to_string(&file)?;
         let header = parse_header(&filestr);
         if let Err(e) = header {
-            let e: HeaderError = HeaderError::from(e.to_owned());
-            return Err(e.into());
+            todo!();
+            //let e: HeaderError = HeaderError::from(e.to_owned());
+            //return Err(e.into());
         };
         todo!()
     }
@@ -65,12 +73,13 @@ pub enum MshSizeT { FourBytes, EightBytes }
 
 // -- helper parsers
 
-pub fn sp(input: &str) -> IResult<&str, &str> {
+
+pub fn sp(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
     tag(" ")(input)
 }
 
 // TODO: add many spaces terminated by eol
-pub fn end_of_line(input: &str) -> IResult<&str, &str> {
+pub fn end_of_line(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
     if input.is_empty() {
         Ok((input, input))
     } else {
@@ -78,10 +87,14 @@ pub fn end_of_line(input: &str) -> IResult<&str, &str> {
     }
 }
 
+pub fn file_header(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
+    context("mesh header", tag("$MeshFormat"))(input)
+}
+
 /// Parse a `msh` file header.
-pub fn mesh_header(input: &str) -> IResult<&str, MshHeader> {
+pub fn mesh_header(input: &str) -> IResult<&str, MshHeader, nom::error::VerboseError<&str>> {
     do_parse!(input,
-        tag!("$MeshFormat") >>
+        file_header >>
         end_of_line >>
         version: alt!(tag!("2.2") | tag!("4.1")) >>
         sp >>
@@ -136,18 +149,24 @@ fn check_header<P>(file: P) -> Result<MshHeader, HeaderError> where P: AsRef<Pat
     let header = parse_header(&buffer);
     match header {
         Ok((_extra_text, header)) => Ok(header),
-        Err(err) => Err(err.to_owned().into()),
+        Err(Err::Error(err)) | Err(Err::Failure(err)) => {
+            Err(HeaderError::Parse {
+                // didn't use context, couldn't get closure type bounds to line up
+                trace: nom::error::convert_error(&buffer, err)
+            })
+        },
+        _ => panic!("unknown error"),
     }
 }
 
-fn parse_header(input: &str) -> IResult<&str, MshHeader> {
+fn parse_header(input: &str) -> IResult<&str, MshHeader, VerboseError<&str>> {
     Ok(mesh_header(input)?)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use insta::assert_debug_snapshot;
+    use insta::{assert_debug_snapshot, assert_display_snapshot};
 
     #[test]
     fn msh2_ascii_header() {
@@ -200,7 +219,11 @@ mod tests {
         path.push("props");
         path.push("v2");
         path.push("bad-header.msh");
-        assert_debug_snapshot!(check_header(&path));
+        let res = check_header(&path);
+        assert!(res.is_err());
+        if let Err(trace) = res {
+            assert_display_snapshot!(trace);
+        }
     }
 
     //#[test]
