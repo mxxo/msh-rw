@@ -182,6 +182,16 @@ mod tests {
         path.push("empty.msh");
         assert_debug_snapshot!(parse_header(&std::fs::read_to_string(&path).unwrap()).unwrap().1);
     }
+
+    #[test]
+    fn msh4_binary_header() {
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("props");
+        path.push("v4");
+        path.push("empty-bin.msh");
+        assert_debug_snapshot!(parse_header(&std::fs::read_to_string(&path).unwrap()).unwrap().1);
+    }
+
     //#[test]
     //fn empty_mesh() {
     //    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
