@@ -205,7 +205,7 @@ mod tests {
         path.push("props");
         path.push("v2");
         path.push("unix-empty.msh");
-        assert_debug_snapshot!(parse_header(&std::fs::read_to_string(&path).unwrap()).unwrap().1);
+        assert_debug_snapshot!(check_header(&path).unwrap());
     }
 
     #[test]
@@ -214,7 +214,7 @@ mod tests {
         path.push("props");
         path.push("v2");
         path.push("empty-bin.msh");
-        assert_debug_snapshot!(parse_header(&std::fs::read_to_string(&path).unwrap()).unwrap().1);
+        assert_debug_snapshot!(check_header(&path).unwrap());
     }
 
     #[test]
@@ -223,7 +223,7 @@ mod tests {
         path.push("props");
         path.push("v4");
         path.push("empty.msh");
-        assert_debug_snapshot!(parse_header(&std::fs::read_to_string(&path).unwrap()).unwrap().1);
+        assert_debug_snapshot!(check_header(&path).unwrap());
     }
 
     #[test]
@@ -232,7 +232,7 @@ mod tests {
         path.push("props");
         path.push("v4");
         path.push("empty-bin.msh");
-        assert_debug_snapshot!(parse_header(&std::fs::read_to_string(&path).unwrap()).unwrap().1);
+        assert_debug_snapshot!(check_header(&path).unwrap());
     }
 
     #[test]
