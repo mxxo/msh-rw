@@ -166,6 +166,15 @@ mod tests {
     }
 
     #[test]
+    fn unix_line_endings() {
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("props");
+        path.push("v2");
+        path.push("unix-empty.msh");
+        assert_debug_snapshot!(parse_header(&std::fs::read_to_string(&path).unwrap()).unwrap().1);
+    }
+
+    #[test]
     fn msh2_binary_header() {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("props");
