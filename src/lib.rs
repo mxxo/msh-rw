@@ -3,6 +3,7 @@ pub mod parser;
 pub type Tag = usize;
 
 use std::path::Path;
+use std::io::{self, Write};
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Copy, Clone)]
@@ -35,11 +36,15 @@ impl Msh {
             physical_groups: Vec::new(),
         }
     }
-    pub fn write_msh2<P: AsRef<Path>>(&self, path: P, storage: MshStorage) -> std::io::Result<()> {
-        todo!();
+
+    pub fn write_msh2<W: Write>(&self, sink: &mut W, storage: MshStorage) -> io::Result<()> {
+        sink.write(format!("{}", MshHeader::v2(storage)).as_bytes())?;
+        Ok(())
     }
-    pub fn write_msh4<P: AsRef<Path>>(&self, path: P, storage: MshStorage) -> std::io::Result<()> {
-        todo!();
+
+    pub fn write_msh4<W: Write>(&self, sink: &mut W, storage: MshStorage) -> io::Result<()> {
+        sink.write(format!("{}", MshHeader::v4(storage)).as_bytes())?;
+        Ok(())
     }
 }
 
@@ -48,6 +53,23 @@ pub struct MshHeader {
     pub version: MshFormat,
     pub storage: MshStorage,
     pub size_t: MshSizeT,
+}
+
+impl MshHeader {
+    pub fn v2(storage: MshStorage) -> Self {
+        MshHeader {
+            storage,
+            version: MshFormat::V22,
+            size_t: MshSizeT::EightBytes,
+        }
+    }
+    pub fn v4(storage: MshStorage) -> Self {
+        MshHeader {
+            storage,
+            version: MshFormat::V41,
+            size_t: MshSizeT::EightBytes,
+        }
+    }
 }
 
 impl std::fmt::Display for MshHeader {
@@ -127,6 +149,22 @@ pub enum MeshShape {
 mod tests {
     use super::*;
     use insta::{assert_debug_snapshot, assert_display_snapshot};
+
+    #[test]
+    fn write_empty_msh2_ascii() {
+        let mut buffer = Vec::new();
+        let msh = Msh::new();
+        msh.write_msh2(&mut buffer, MshStorage::Ascii).unwrap();
+        assert_debug_snapshot!(String::from_utf8(buffer).unwrap());
+    }
+
+    #[test]
+    fn write_empty_msh4_ascii() {
+        let mut buffer = Vec::new();
+        let msh = Msh::new();
+        msh.write_msh4(&mut buffer, MshStorage::Ascii).unwrap();
+        assert_debug_snapshot!(String::from_utf8(buffer).unwrap());
+    }
 
     #[cfg(feature = "serde")]
     #[test]

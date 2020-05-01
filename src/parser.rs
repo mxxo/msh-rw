@@ -25,8 +25,7 @@ pub type MshResult<T> = std::result::Result<T, MshError>;
 
 impl Msh {
     fn from_file<P: AsRef<Path>>(path: P) -> MshResult<Msh> {
-        let header_section = first_four_lines(path)?;
-        let header = parse_header(&header_section)?;
+        let header = parse_header(&first_four_lines(path)?)?;
         todo!()
     }
 }
