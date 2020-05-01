@@ -44,8 +44,8 @@ pub enum MshError {
 
 pub type MshResult<T> = std::result::Result<T, MshError>;
 
-impl Msh2 {
-    fn from_file(file: &PathBuf) -> MshResult<Msh2> {
+impl Msh {
+    fn from_file(file: &PathBuf) -> MshResult<Msh> {
         let filestr = std::fs::read_to_string(&file)?;
         let header = parse_header(&filestr);
         if let Err(e) = header {
@@ -67,12 +67,9 @@ pub struct MshHeader {
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum MshFormat { V22, V41 }
 #[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum MshStorage { Ascii, BinaryLe, BinaryBe }
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub enum MshSizeT { FourBytes, EightBytes }
 
 // -- helper parsers
-
 
 pub fn sp(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
     tag(" ")(input)
@@ -231,6 +228,6 @@ mod tests {
     //    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
     //    path.push("props");
     //    path.push("empty.msh");
-    //    Msh2::from_file(&path).unwrap();
+    //    Msh::from_file(&path).unwrap();
     //}
 }

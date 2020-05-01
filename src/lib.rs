@@ -17,11 +17,33 @@ impl Dim {
     }
 }
 
-#[derive(Debug, Clone)]
-pub struct Msh2 {
+#[derive(Debug, Clone, Default)]
+pub struct Msh {
     pub nodes: Vec<Point>,
     pub elts: Vec<MeshElt>,
-    pub physical_groups: Option<Vec<(Dim, Tag)>>,
+    pub physical_groups: Vec<(Dim, Tag)>,
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum MshStorage { Ascii, BinaryLe, BinaryBe }
+
+impl Msh {
+
+    pub fn new() -> Msh {
+        Msh {
+            nodes: Vec::new(),
+            elts: Vec::new(),
+            physical_groups: Vec::new(),
+        }
+    }
+
+    pub fn write_msh2(&self, storage: MshStorage) -> std::io::Result<()> {
+        todo!();
+    }
+
+    pub fn write_msh4(&self, storage: MshStorage) -> std::io::Result<()> {
+        todo!();
+    }
 }
 
 #[derive(Debug, Copy, Clone)]
