@@ -1,4 +1,4 @@
-## ⓜⓢⓗ🅟🅐🅡🅢🅔🅡 
+## 𝕞𝕠𝕤𝕙
 A Gmsh mesh file parser. 
 
 ### `serde` integration 
