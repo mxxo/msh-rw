@@ -6,55 +6,42 @@ use nom::*;
 use nom::bytes::complete::tag;
 use nom::character::complete::line_ending;
 use nom::error::{context, VerboseError};
-//use nom::number::complete::{double, le_i32};
-
-#[derive(Error, Debug)]
-pub enum HeaderError {
-    #[error("IO error ({source:?})")]
-    Io {
-        #[from]
-        source: std::io::Error,
-    },
-//    #[error("header parse error ({source})")]
-    //Parse {
-    //    #[from]
-    //    //source: nom::Err<(String, nom::error::ErrorKind)>,
-    //    //source: nom::Err<(VerboseError<String>, nom::error::VerboseErrorKind)>,
-    //    source: nom::Err<(VerboseError<String>, nom::error::VerboseErrorKind)>,
-    //}
-    #[error("header parse error:\n{trace}")]
-    Parse {
-        trace: String,
-    }
-}
 
 #[derive(Error, Debug)]
 pub enum MshError {
-    #[error("IO error ({source:?})")]
+    #[error("IO error ({source})")]
     Io {
         #[from]
         source: std::io::Error,
     },
-    #[error("Bad file header ({source:?})")]
-    Header {
+    #[error("header parse error:\n{source}")]
+    Parse {
         #[from]
-        source: crate::parser::HeaderError,
-    },
+        source: nom::Err<(String, nom::error::ErrorKind)>,
+    }
 }
 
 pub type MshResult<T> = std::result::Result<T, MshError>;
 
 impl Msh {
     fn from_file<P: AsRef<Path>>(path: P) -> MshResult<Msh> {
-        let filestr = std::fs::read_to_string(&path)?;
-        let header = parse_header(&filestr);
-        if let Err(e) = header {
-            todo!();
-            //let e: HeaderError = HeaderError::from(e.to_owned());
-            //return Err(e.into());
-        };
+        let header_section = first_four_lines(path)?;
+        let header = parse_header(&header_section)?;
         todo!()
     }
+}
+
+fn first_four_lines<P: AsRef<Path>>(path: P) -> std::io::Result<String> {
+    use std::io::BufRead;
+    // examine first 3-4 lines, instead of reading the whole file
+    // because binary files aren't utf8
+    let file = std::fs::File::open(path)?;
+    let mut reader = std::io::BufReader::new(file);
+    let mut buffer = String::new();
+    for _ in 0..=3 {
+        reader.read_line(&mut buffer)?;
+    }
+    Ok(buffer)
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -71,12 +58,12 @@ pub enum MshSizeT { FourBytes, EightBytes }
 
 // -- helper parsers
 
-pub fn sp(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
+pub fn sp(input: &str) -> IResult<&str, &str> {
     tag(" ")(input)
 }
 
 // TODO: add many spaces terminated by eol
-pub fn end_of_line(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
+pub fn end_of_line(input: &str) -> IResult<&str, &str> {
     if input.is_empty() {
         Ok((input, input))
     } else {
@@ -84,12 +71,12 @@ pub fn end_of_line(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
     }
 }
 
-pub fn file_header(input: &str) -> IResult<&str, &str, VerboseError<&str>> {
+pub fn file_header(input: &str) -> IResult<&str, &str> {
     context("mesh header", tag("$MeshFormat"))(input)
 }
 
 /// Parse a `msh` file header.
-pub fn mesh_header(input: &str) -> IResult<&str, MshHeader, nom::error::VerboseError<&str>> {
+pub fn mesh_header(input: &str) -> IResult<&str, MshHeader> {
     do_parse!(input,
         file_header >>
         end_of_line >>
@@ -130,34 +117,11 @@ pub fn mesh_header(input: &str) -> IResult<&str, MshHeader, nom::error::VerboseE
     )
 }
 
-fn check_header<P>(file: P) -> Result<MshHeader, HeaderError> where P: AsRef<Path> {
-    use std::io::BufRead;
-    // examine first 3-4 lines, instead of reading the whole file
-    // because binary files aren't utf8
-    let file = std::fs::File::open(file)?;
-    let mut reader = std::io::BufReader::new(file);
-    let mut buffer = String::new();
-
-    // TODO better header error here
-    for _ in 0..=3 {
-        reader.read_line(&mut buffer)?;
-    }
-    println!("{}", buffer);
-    let header = parse_header(&buffer);
-    match header {
+fn parse_header(input: &str) -> MshResult<MshHeader> {
+    match mesh_header(input) {
         Ok((_extra_text, header)) => Ok(header),
-        Err(Err::Error(err)) | Err(Err::Failure(err)) => {
-            Err(HeaderError::Parse {
-                // didn't use context, couldn't get closure type bounds to line up
-                trace: nom::error::convert_error(&buffer, err)
-            })
-        },
-        _ => panic!("unknown error"),
+        Err(e) => Err(e.to_owned().into()),
     }
-}
-
-fn parse_header(input: &str) -> IResult<&str, MshHeader, VerboseError<&str>> {
-    Ok(mesh_header(input)?)
 }
 
 #[cfg(test)]
@@ -171,7 +135,7 @@ mod tests {
         path.push("props");
         path.push("v2");
         path.push("empty.msh");
-        assert_debug_snapshot!(check_header(&path).unwrap());
+        assert_debug_snapshot!(parse_header(&first_four_lines(path).unwrap()).unwrap());
     }
 
     #[test]
@@ -180,7 +144,7 @@ mod tests {
         path.push("props");
         path.push("v2");
         path.push("unix-empty.msh");
-        assert_debug_snapshot!(check_header(&path).unwrap());
+        assert_debug_snapshot!(parse_header(&first_four_lines(path).unwrap()).unwrap());
     }
 
     #[test]
@@ -189,7 +153,7 @@ mod tests {
         path.push("props");
         path.push("v2");
         path.push("empty-bin.msh");
-        assert_debug_snapshot!(check_header(&path).unwrap());
+        assert_debug_snapshot!(parse_header(&first_four_lines(path).unwrap()).unwrap());
     }
 
     #[test]
@@ -198,7 +162,7 @@ mod tests {
         path.push("props");
         path.push("v4");
         path.push("empty.msh");
-        assert_debug_snapshot!(check_header(&path).unwrap());
+        assert_debug_snapshot!(parse_header(&first_four_lines(path).unwrap()).unwrap());
     }
 
     #[test]
@@ -207,7 +171,7 @@ mod tests {
         path.push("props");
         path.push("v4");
         path.push("empty-bin.msh");
-        assert_debug_snapshot!(check_header(&path).unwrap());
+        assert_debug_snapshot!(parse_header(&first_four_lines(path).unwrap()).unwrap());
     }
 
     #[test]
@@ -216,7 +180,7 @@ mod tests {
         path.push("props");
         path.push("v2");
         path.push("bad-header.msh");
-        let res = check_header(&path);
+        let res = parse_header(&first_four_lines(path).unwrap());
         assert!(res.is_err());
         if let Err(trace) = res {
             assert_display_snapshot!(trace);
