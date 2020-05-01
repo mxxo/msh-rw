@@ -1,11 +1,11 @@
 use crate::*;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use thiserror::Error;
 
 use nom::*;
 use nom::bytes::complete::tag;
 use nom::character::complete::line_ending;
-use nom::error::{context, VerboseError};
+use nom::error::context;
 
 #[derive(Error, Debug)]
 pub enum MshError {
@@ -43,18 +43,6 @@ fn first_four_lines<P: AsRef<Path>>(path: P) -> std::io::Result<String> {
     }
     Ok(buffer)
 }
-
-#[derive(Debug, Copy, Clone)]
-pub struct MshHeader {
-    pub version: MshFormat,
-    pub storage: MshStorage,
-    pub size_t: MshSizeT,
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum MshFormat { V22, V41 }
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum MshSizeT { FourBytes, EightBytes }
 
 // -- helper parsers
 
@@ -127,6 +115,7 @@ fn parse_header(input: &str) -> MshResult<MshHeader> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::path::PathBuf;
     use insta::{assert_debug_snapshot, assert_display_snapshot};
 
     #[test]

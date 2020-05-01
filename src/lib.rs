@@ -27,9 +27,6 @@ pub struct Msh {
     pub physical_groups: Vec<(Dim, Tag)>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum MshStorage { Ascii, BinaryLe, BinaryBe }
-
 impl Msh {
     pub fn new() -> Msh {
         Msh {
@@ -43,6 +40,59 @@ impl Msh {
     }
     pub fn write_msh4<P: AsRef<Path>>(&self, path: P, storage: MshStorage) -> std::io::Result<()> {
         todo!();
+    }
+}
+
+#[derive(Debug, Copy, Clone)]
+pub struct MshHeader {
+    pub version: MshFormat,
+    pub storage: MshStorage,
+    pub size_t: MshSizeT,
+}
+
+impl std::fmt::Display for MshHeader {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        writeln!(fmt, "$MeshFormat")?;
+        writeln!(fmt, "{} {} {}", self.version, self.storage, self.size_t)?;
+        match self.storage {
+            MshStorage::BinaryBe => writeln!(fmt, "\u{0}\u{0}\u{0}\u{1}")?,
+            MshStorage::BinaryLe => writeln!(fmt, "\u{1}\u{0}\u{0}\u{0}")?,
+            MshStorage::Ascii => (/* skip */),
+        };
+        writeln!(fmt, "$EndMeshFormat")
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum MshStorage { Ascii, BinaryLe, BinaryBe }
+impl std::fmt::Display for MshStorage {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            MshStorage::Ascii => write!(fmt, "0"),
+            MshStorage::BinaryLe | MshStorage::BinaryBe => write!(fmt, "1"),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum MshFormat { V22, V41 }
+impl std::fmt::Display for MshFormat {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            MshFormat::V22 => write!(fmt, "2.2"),
+            MshFormat::V41 => write!(fmt, "4.1"),
+        }
+    }
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum MshSizeT { FourBytes, EightBytes }
+impl std::fmt::Display for MshSizeT {
+    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        match self {
+            MshSizeT::FourBytes => write!(fmt, "4"),
+            MshSizeT::EightBytes => write!(fmt, "8"),
+        }
     }
 }
 
@@ -78,6 +128,7 @@ mod tests {
     use super::*;
     use insta::{assert_debug_snapshot, assert_display_snapshot};
 
+    #[cfg(feature = "serde")]
     #[test]
     fn msh_json() {
         let mut msh = Msh::new();
