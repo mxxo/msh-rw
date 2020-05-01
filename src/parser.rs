@@ -45,8 +45,8 @@ pub enum MshError {
 pub type MshResult<T> = std::result::Result<T, MshError>;
 
 impl Msh {
-    fn from_file(file: &PathBuf) -> MshResult<Msh> {
-        let filestr = std::fs::read_to_string(&file)?;
+    fn from_file<P: AsRef<Path>>(path: P) -> MshResult<Msh> {
+        let filestr = std::fs::read_to_string(&path)?;
         let header = parse_header(&filestr);
         if let Err(e) = header {
             todo!();
