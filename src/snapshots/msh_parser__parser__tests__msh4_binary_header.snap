@@ -1,0 +1,9 @@
+---
+source: src/parser.rs
+expression: check_header(&path).unwrap()
+---
+MshHeader {
+    version: V41,
+    storage: BinaryLe,
+    size_t: EightBytes,
+}

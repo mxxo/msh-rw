@@ -1,0 +1,9 @@
+---
+source: src/parser.rs
+expression: "parse_header(&std::fs::read_to_string(&path).unwrap()).unwrap().1"
+---
+MshHeader {
+    version: V22,
+    storage: BinaryLe,
+    size_t: EightBytes,
+}

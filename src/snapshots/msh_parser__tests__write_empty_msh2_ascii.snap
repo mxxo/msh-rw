@@ -1,0 +1,5 @@
+---
+source: src/lib.rs
+expression: "String::from_utf8(buffer).unwrap()"
+---
+"$MeshFormat\n2.2 0 8\n$EndMeshFormat\n$Nodes\n0\n$EndNodes\n"
