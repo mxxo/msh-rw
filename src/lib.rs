@@ -1,6 +1,6 @@
 //! Gmsh **`msh`** file parser.
 pub mod parser;
-pub type Tag = usize;
+pub type Tag = u64; // always write out 8-byte tags
 
 use std::path::Path;
 use std::io::{self, Write};
@@ -26,6 +26,7 @@ pub struct Msh {
     pub nodes: Vec<Point>,
     pub elts: Vec<MeshElt>,
     pub physical_groups: Vec<(Dim, Tag)>,
+    // entity blocs -- need to match to nodes
 }
 
 impl Msh {
@@ -38,12 +39,32 @@ impl Msh {
     }
 
     pub fn write_msh2<W: Write>(&self, sink: &mut W, storage: MshStorage) -> io::Result<()> {
-        sink.write(format!("{}", MshHeader::v2(storage)).as_bytes())?;
+        write!(sink, "{}", MshHeader::v2(storage))?;
+        writeln!(sink, "$Nodes")?;
+        writeln!(sink, "{}", self.nodes.len())?;
+        for node in &self.nodes {
+            match storage {
+                MshStorage::Ascii => writeln!(sink, "{} {} {} {}", node.tag, node.x, node.y, node.z)?,
+                MshStorage::BinaryLe => {
+                    sink.write_all(&node.tag.to_le_bytes())?;
+                    sink.write_all(&node.x.to_le_bytes())?;
+                    sink.write_all(&node.y.to_le_bytes())?;
+                    sink.write_all(&node.z.to_le_bytes())?
+                },
+                MshStorage::BinaryBe => {
+                    sink.write_all(&node.tag.to_be_bytes())?;
+                    sink.write_all(&node.x.to_be_bytes())?;
+                    sink.write_all(&node.y.to_be_bytes())?;
+                    sink.write_all(&node.z.to_be_bytes())?
+                },
+            }
+        }
+        writeln!(sink, "$EndNodes")?;
         Ok(())
     }
 
     pub fn write_msh4<W: Write>(&self, sink: &mut W, storage: MshStorage) -> io::Result<()> {
-        sink.write(format!("{}", MshHeader::v4(storage)).as_bytes())?;
+        write!(sink, "{}", MshHeader::v4(storage))?;
         Ok(())
     }
 }
@@ -163,6 +184,25 @@ mod tests {
         let mut buffer = Vec::new();
         let msh = Msh::new();
         msh.write_msh4(&mut buffer, MshStorage::Ascii).unwrap();
+        assert_debug_snapshot!(String::from_utf8(buffer).unwrap());
+    }
+
+    #[test]
+    fn basic_msh2_ascii() {
+        let mut msh = Msh::new();
+        msh.nodes = vec![
+            Point { tag: 1, x: 0.0, y: 0.0, z: 0.0, },
+            Point { tag: 2, x: 1.0, y: 0.0, z: 0.0, },
+        ];
+        msh.elts = vec![MeshElt {
+                tag: 1,
+                ty: MeshShape::Line,
+                nodes: vec![1, 2],
+                physical_groups: None,
+            }
+        ];
+        let mut buffer = Vec::new();
+        msh.write_msh2(&mut buffer, MshStorage::Ascii).unwrap();
         assert_debug_snapshot!(String::from_utf8(buffer).unwrap());
     }
 
