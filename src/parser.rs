@@ -139,7 +139,12 @@ fn parse_header(input: &str) -> MshResult<MshHeader> {
 fn parse_node_section_msh2(input: &str) -> IResult<&str, Vec<Point>> {
     use nom::sequence::terminated;
     let (input, _) = terminated(tag("$Nodes"), end_of_line)(input)?;
-    let (input, (nodes, _)) = many_till(parse_node_msh2, tag("$EndNodes"))(input)?;
+    let (input, num_nodes) = terminated(parse_u64, end_of_line)(input)?;
+    let (input, (nodes, _)) = many_till(parse_node_msh2, terminated(tag("$EndNodes"), end_of_line))(input)?;
+    if num_nodes != nodes.len() as u64 {
+        // we don't really care if the number doesn't line up for msh2
+        eprintln!("warning: node header says {} nodes, but parsed {}", num_nodes, nodes.len());
+    }
     Ok((input, nodes))
 }
 
@@ -181,11 +186,21 @@ mod msh2 {
         assert_debug_snapshot!(parse_node_msh2(inp).unwrap().1);
     }
 
-
-
     #[test]
     fn some_nodes() {
-        let inp = "$Nodes\n1 0. 0. 1.\n2 1. 1 1\n100 1 1 1\n$EndNodes\n";
+        let inp = "$Nodes\n3\n1 0. 0. 1.\n2 1. 1 1\n100 1 1 1\n$EndNodes\n";
+        assert_debug_snapshot!(parse_node_section_msh2(inp).unwrap().1);
+    }
+
+    #[test]
+    fn nodes_len_mismatch() {
+        let inp = "$Nodes\n0\n1 0. 0. 1.\n2 1. 1 1\n100 1 1 1\n$EndNodes\n";
+        assert_debug_snapshot!(parse_node_section_msh2(inp).unwrap().1);
+    }
+
+    #[test]
+    fn empty_nodes() {
+        let inp = "$Nodes\n0\n$EndNodes\n";
         assert_debug_snapshot!(parse_node_section_msh2(inp).unwrap().1);
     }
 
