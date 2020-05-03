@@ -2,8 +2,11 @@
 source: src/parser.rs
 expression: parse_header(&first_four_lines(path).unwrap()).unwrap()
 ---
-MshHeader {
-    version: V41,
-    storage: Ascii,
-    size_t: EightBytes,
-}
+(
+    "\r\n$EndMeshFormat\r\n$Entities\r\n",
+    MshHeader {
+        version: V41,
+        storage: Ascii,
+        size_t: EightBytes,
+    },
+)

@@ -2,8 +2,11 @@
 source: src/parser.rs
 expression: parse_header(&first_four_lines(path).unwrap()).unwrap()
 ---
-MshHeader {
-    version: V22,
-    storage: BinaryLe,
-    size_t: EightBytes,
-}
+(
+    "$EndMeshFormat\n",
+    MshHeader {
+        version: V22,
+        storage: BinaryLe,
+        size_t: EightBytes,
+    },
+)

@@ -2,5 +2,5 @@
 source: src/parser.rs
 expression: trace
 ---
-header parse error:
+parse error:
 Parsing Error: ("$MshFmt\r\n2.2 0 8\r\n$EndMeshFormat\r\n$Nodes\r\n", Tag)

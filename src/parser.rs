@@ -9,6 +9,7 @@ use nom::character::complete::{line_ending, digit1};
 use nom::multi::many_till;
 use nom::number::complete::double;
 use nom::error::context;
+use nom::sequence::terminated;
 
 use std::path::Path;
 use std::str::FromStr;
@@ -20,7 +21,7 @@ pub enum MshError {
         #[from]
         source: std::io::Error,
     },
-    #[error("header parse error:\n{source}")]
+    #[error("parse error:\n{source}")]
     Parse {
         #[from]
         source: nom::Err<(String, nom::error::ErrorKind)>,
@@ -31,9 +32,16 @@ pub type MshResult<T> = std::result::Result<T, MshError>;
 
 impl Msh {
     fn from_file<P: AsRef<Path>>(path: P) -> MshResult<Msh> {
-        let header = parse_header(&first_four_lines(path)?)?;
+        let (input, header) = parse_header(&first_four_lines(path)?)?;
+        //match header {
+        //    todo!();
+        //}
         todo!()
     }
+}
+
+fn parse_msh2() -> MshResult<Msh> {
+    todo!()
 }
 
 fn first_four_lines<P: AsRef<Path>>(path: P) -> std::io::Result<String> {
@@ -74,15 +82,18 @@ pub fn end_of_line(input: &str) -> IResult<&str, &str> {
     }
 }
 
-pub fn file_header(input: &str) -> IResult<&str, &str> {
-    context("mesh header", tag("$MeshFormat"))(input)
+pub fn format_header(input: &str) -> IResult<&str, &str> {
+    terminated(tag("$MeshFormat"), end_of_line)(input)
+}
+
+pub fn format_footer(input: &str) -> IResult<&str, &str> {
+    terminated(tag("$EndMeshFormat"), end_of_line)(input)
 }
 
 /// Parse a `msh` file header.
 pub fn mesh_header(input: &str) -> IResult<&str, MshHeader> {
     do_parse!(input,
-        file_header >>
-        end_of_line >>
+        format_header >>
         version: alt!(tag!("2.2") | tag!("4.1")) >>
         sp >>
         binary: one_of!("01") >>
@@ -93,9 +104,11 @@ pub fn mesh_header(input: &str) -> IResult<&str, MshHeader> {
                 end_of_line >>
                 // gmsh docs say ascii int = 1 => I assume this means 4 bytes?
                 endianness: take!(4) >>
+                end_of_line >>
                 (Some(endianness))
             )
         ) >>
+        // format_footer >>
         (MshHeader {
             version: match version {
                "2.2" => MshFormat::V22,
@@ -120,24 +133,14 @@ pub fn mesh_header(input: &str) -> IResult<&str, MshHeader> {
     )
 }
 
-fn parse_header(input: &str) -> MshResult<MshHeader> {
+fn parse_header(input: &str) -> MshResult<(&str, MshHeader)> {
     match mesh_header(input) {
-        Ok((_extra_text, header)) => Ok(header),
+        Ok(res) => Ok(res),
         Err(e) => Err(e.to_owned().into()),
     }
 }
 
-//fn line(input: &str, term: &str) -> IResult<&str, &str> {
-//    terminated(tag(term), end_of_line)(input)
-//}
-
-//pub fn parse_nodes_msh2(input: &str) -> MshResult<Vec<Point>> {
-//    context("mesh header", tag("$MeshFormat"))(input)
-//}
-//
-
 fn parse_node_section_msh2(input: &str) -> IResult<&str, Vec<Point>> {
-    use nom::sequence::terminated;
     let (input, _) = terminated(tag("$Nodes"), end_of_line)(input)?;
     let (input, num_nodes) = terminated(parse_u64, end_of_line)(input)?;
     let (input, (nodes, _)) = many_till(parse_node_msh2, terminated(tag("$EndNodes"), end_of_line))(input)?;
@@ -154,9 +157,7 @@ fn parse_node_msh2(input: &str) -> IResult<&str, Point> {
         x: double >> sp >>
         y: double >> sp >>
         z: double >> end_of_line >>
-        (
-            Point { tag, x, y, z }
-        )
+        ( Point { tag, x, y, z } )
     )
 }
 
@@ -237,7 +238,8 @@ mod msh2 {
         path.push("props");
         path.push("v2");
         path.push("bad-header.msh");
-        let res = parse_header(&first_four_lines(path).unwrap());
+        let header_str = first_four_lines(path).unwrap();
+        let res = parse_header(&header_str);
         assert!(res.is_err());
         if let Err(trace) = res {
             assert_display_snapshot!(trace);
