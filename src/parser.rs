@@ -1,11 +1,16 @@
 use crate::*;
-use std::path::Path;
+
 use thiserror::Error;
 
 use nom::*;
 use nom::bytes::complete::tag;
-use nom::character::complete::line_ending;
+use nom::combinator::map_res;
+use nom::character::complete::{line_ending, digit1};
+use nom::number::complete::double;
 use nom::error::context;
+
+use std::path::Path;
+use std::str::FromStr;
 
 #[derive(Error, Debug)]
 pub enum MshError {
@@ -111,11 +116,44 @@ fn parse_header(input: &str) -> MshResult<MshHeader> {
     }
 }
 
+//pub fn parse_nodes_msh2(input: &str) -> MshResult<Vec<Point>> {
+//    context("mesh header", tag("$MeshFormat"))(input)
+//}
+//
+
+fn parse_node_section_msh2(input: &str) -> IResult<&str, Vec<Point>> {
+    use nom::sequence::terminated;
+    let (input, _) = terminated(tag("$Nodes"), end_of_line)(input)?;
+    todo!()
+}
+
+fn parse_node_msh2(input: &str) -> IResult<&str, Point> {
+    do_parse!(input,
+        tag: parse_u64 >> sp >>
+        x: double >> sp >>
+        y: double >> sp >>
+        z: double >> end_of_line >>
+        (
+            Point { tag, x, y, z }
+        )
+    )
+}
+
+fn parse_u64(input: &str) -> IResult<&str, u64> {
+    map_res(digit1, u64::from_str)(input)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use std::path::PathBuf;
     use insta::{assert_debug_snapshot, assert_display_snapshot};
+
+    #[test]
+    fn node_msh2() {
+        let inp = "1201 0. 0. 1.";
+        assert_debug_snapshot!(parse_node_msh2(inp).unwrap().1);
+    }
 
     #[test]
     fn msh2_ascii_header() {
