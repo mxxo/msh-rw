@@ -6,6 +6,7 @@ use nom::*;
 use nom::bytes::complete::tag;
 use nom::combinator::map_res;
 use nom::character::complete::{line_ending, digit1};
+use nom::multi::many_till;
 use nom::number::complete::double;
 use nom::error::context;
 
@@ -54,12 +55,22 @@ pub fn sp(input: &str) -> IResult<&str, &str> {
     tag(" ")(input)
 }
 
+pub fn tab(input: &str) -> IResult<&str, &str> {
+    tag("\t")(input)
+}
+
+pub fn whitespace(input: &str) -> IResult<&str, &str> {
+    use nom::branch::alt;
+    alt((sp, tab))(input)
+}
+
 // TODO: add many spaces terminated by eol
 pub fn end_of_line(input: &str) -> IResult<&str, &str> {
     if input.is_empty() {
         Ok((input, input))
     } else {
-        line_ending(input)
+        let (input, (_, eol)) = many_till(whitespace, line_ending)(input)?;
+        Ok((input, eol))
     }
 }
 
@@ -116,6 +127,10 @@ fn parse_header(input: &str) -> MshResult<MshHeader> {
     }
 }
 
+//fn line(input: &str, term: &str) -> IResult<&str, &str> {
+//    terminated(tag(term), end_of_line)(input)
+//}
+
 //pub fn parse_nodes_msh2(input: &str) -> MshResult<Vec<Point>> {
 //    context("mesh header", tag("$MeshFormat"))(input)
 //}
@@ -124,7 +139,8 @@ fn parse_header(input: &str) -> MshResult<MshHeader> {
 fn parse_node_section_msh2(input: &str) -> IResult<&str, Vec<Point>> {
     use nom::sequence::terminated;
     let (input, _) = terminated(tag("$Nodes"), end_of_line)(input)?;
-    todo!()
+    let (input, (nodes, _)) = many_till(parse_node_msh2, tag("$EndNodes"))(input)?;
+    Ok((input, nodes))
 }
 
 fn parse_node_msh2(input: &str) -> IResult<&str, Point> {
@@ -150,9 +166,27 @@ mod tests {
     use insta::{assert_debug_snapshot, assert_display_snapshot};
 
     #[test]
-    fn node_msh2() {
-        let inp = "1201 0. 0. 1.";
+    fn trailing_spaces() {
+        let inp = "101 0 1 100.0      \t\n";
         assert_debug_snapshot!(parse_node_msh2(inp).unwrap().1);
+    }
+
+mod msh2 {
+
+    use super::*;
+
+    #[test]
+    fn node_msh2() {
+        let inp = "1201 0 0. 1.";
+        assert_debug_snapshot!(parse_node_msh2(inp).unwrap().1);
+    }
+
+
+
+    #[test]
+    fn some_nodes() {
+        let inp = "$Nodes\n1 0. 0. 1.\n2 1. 1 1\n100 1 1 1\n$EndNodes\n";
+        assert_debug_snapshot!(parse_node_section_msh2(inp).unwrap().1);
     }
 
     #[test]
@@ -183,6 +217,23 @@ mod tests {
     }
 
     #[test]
+    fn bad_header() {
+        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        path.push("props");
+        path.push("v2");
+        path.push("bad-header.msh");
+        let res = parse_header(&first_four_lines(path).unwrap());
+        assert!(res.is_err());
+        if let Err(trace) = res {
+            assert_display_snapshot!(trace);
+        }
+    }
+}
+
+mod msh4 {
+    use super::*;
+
+    #[test]
     fn msh4_ascii_header() {
         let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
         path.push("props");
@@ -199,20 +250,6 @@ mod tests {
         path.push("empty-bin.msh");
         assert_debug_snapshot!(parse_header(&first_four_lines(path).unwrap()).unwrap());
     }
-
-    #[test]
-    fn bad_header() {
-        let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        path.push("props");
-        path.push("v2");
-        path.push("bad-header.msh");
-        let res = parse_header(&first_four_lines(path).unwrap());
-        assert!(res.is_err());
-        if let Err(trace) = res {
-            assert_display_snapshot!(trace);
-        }
-    }
-
     //#[test]
     //fn empty_mesh() {
     //    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
@@ -220,4 +257,5 @@ mod tests {
     //    path.push("empty.msh");
     //    Msh::from_file(&path).unwrap();
     //}
+}
 }

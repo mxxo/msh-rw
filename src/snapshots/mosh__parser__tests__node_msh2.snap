@@ -1,0 +1,10 @@
+---
+source: src/parser.rs
+expression: parse_node_msh2(inp).unwrap().1
+---
+Point {
+    tag: 1201,
+    x: 0.0,
+    y: 0.0,
+    z: 1.0,
+}
