@@ -1,6 +1,6 @@
 ---
 source: src/parser.rs
-expression: "parse_header(&std::fs::read_to_string(&path).unwrap()).unwrap().1"
+expression: parse_header(&first_four_lines(path).unwrap()).unwrap()
 ---
 MshHeader {
     version: V41,

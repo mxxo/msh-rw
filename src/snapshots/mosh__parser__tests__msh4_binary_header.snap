@@ -1,6 +1,6 @@
 ---
 source: src/parser.rs
-expression: check_header(&path).unwrap()
+expression: parse_header(&first_four_lines(path).unwrap()).unwrap()
 ---
 MshHeader {
     version: V41,

@@ -1,5 +1,0 @@
----
-source: src/lib.rs
-expression: "serde_json::to_string(&msh).unwrap()"
----
-{"nodes":[{"tag":1,"x":0.0,"y":0.0,"z":0.0},{"tag":2,"x":1.0,"y":0.0,"z":0.0}],"elts":[{"tag":1,"ty":"Line","nodes":[1,2],"physical_groups":null}],"physical_groups":[]}

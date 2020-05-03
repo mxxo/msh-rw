@@ -1,8 +1,9 @@
-//! Gmsh **`msh`** file parser.
-pub mod parser;
+//! Gmsh file parser.
 pub type Tag = u64; // always write out 8-byte tags
 
-use std::path::Path;
+pub mod parser;
+pub mod mesh;
+
 use std::io::{self, Write};
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]

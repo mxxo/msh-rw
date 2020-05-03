@@ -1,5 +1,5 @@
 [package]
-name = "msh_parser"
+name = "mosh"
 version = "0.1.0"
 authors = ["Max Orok <maxwellorok@gmail.com>"]
 edition = "2018"

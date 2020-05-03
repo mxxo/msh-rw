@@ -1,4 +1,4 @@
-use msh_parser::*;
+use mosh::*;
 
 fn main() {
     let mut msh = Msh::new();
