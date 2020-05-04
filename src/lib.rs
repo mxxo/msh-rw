@@ -19,6 +19,17 @@ impl Dim {
             _ => None,
         }
     }
+    pub fn from_u8_unchecked(dim: u8) -> Dim {
+        Dim { dim }
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[derive(Debug, Clone)]
+pub struct PhysicalGroup {
+    pub dim: Dim,
+    pub tag: Tag,
+    pub name: String,
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
@@ -26,7 +37,7 @@ impl Dim {
 pub struct Msh {
     pub nodes: Vec<Point>,
     pub elts: Vec<MeshElt>,
-    pub physical_groups: Vec<(Dim, Tag)>,
+    pub physical_groups: Vec<PhysicalGroup>,
     // entity blocs -- need to match to nodes
 }
 

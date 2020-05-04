@@ -3,13 +3,13 @@ use crate::*;
 use thiserror::Error;
 
 use nom::*;
-use nom::bytes::complete::tag;
+use nom::bytes::complete::{tag, take_until};
 use nom::combinator::map_res;
-use nom::character::complete::{line_ending, digit1};
+use nom::character::complete::{anychar, char, line_ending, digit1, one_of};
 use nom::multi::many_till;
 use nom::number::complete::double;
 use nom::error::context;
-use nom::sequence::terminated;
+use nom::sequence::{delimited, preceded, terminated};
 
 use std::path::Path;
 use std::str::FromStr;
@@ -161,6 +161,32 @@ fn parse_node_msh2(input: &str) -> IResult<&str, Point> {
     )
 }
 
+fn parse_physical_groups_msh2(input: &str) -> IResult<&str, Vec<PhysicalGroup>> {
+    let (input, _) = terminated(tag("$PhysicalNames"), end_of_line)(input)?;
+    let (input, num_groups) = terminated(parse_u64, end_of_line)(input)?;
+    //let (input, (nodes, _)) = many_till(parse_node_msh2, terminated(tag("$EndPhysicalNames"), end_of_line))(input)?;
+    //if num_nodes != nodes.len() as u64 {
+    //    // we don't really care if the number doesn't line up for msh2
+    //    eprintln!("warning: node header says {} nodes, but read {}", num_nodes, nodes.len());
+    //}
+    //Ok((input, nodes))
+    todo!()
+}
+
+fn parse_physical_group_msh2(input: &str) -> IResult<&str, PhysicalGroup> {
+    let (input, dim) = parse_dimension(input)?;
+    let (input, _) = sp(input)?;
+    let (input, tag) = parse_u64(input)?;
+    let (input, _) = sp(input)?;
+    let (input, name) = preceded(char('"'), take_until("\""))(input)?;
+    Ok((input, crate::PhysicalGroup { dim, tag, name: name.to_string() }))
+}
+
+fn parse_dimension(input: &str) -> IResult<&str, Dim> {
+    let (input, dim) = one_of("0123")(input)?;
+    Ok((input, Dim::from_u8_unchecked(u8::from_str(&dim.to_string()).unwrap())))
+}
+
 fn parse_u64(input: &str) -> IResult<&str, u64> {
     map_res(digit1, u64::from_str)(input)
 }
@@ -183,14 +209,20 @@ mod msh2 {
 
     #[test]
     fn node_msh2() {
-        let inp = "1201 0 0. 1.";
-        assert_debug_snapshot!(parse_node_msh2(inp).unwrap().1);
+        let i = "1201 0 0. 1.";
+        assert_debug_snapshot!(parse_node_msh2(i).unwrap().1);
+    }
+
+    #[test]
+    fn pgroup_msh2() {
+        let i = r##"3 1 "Water cube""##;
+        assert_debug_snapshot!(parse_physical_group_msh2(i).unwrap().1);
     }
 
     #[test]
     fn some_nodes() {
-        let inp = "$Nodes\n3\n1 0. 0. 1.\n2 1. 1 1\n100 1 1 1\n$EndNodes\n";
-        assert_debug_snapshot!(parse_node_section_msh2(inp).unwrap().1);
+        let i = "$Nodes\n3\n1 0. 0. 1.\n2 1. 1 1\n100 1 1 1\n$EndNodes\n";
+        assert_debug_snapshot!(parse_node_section_msh2(i).unwrap().1);
     }
 
     #[test]
