@@ -99,16 +99,16 @@ pub fn mesh_header(input: &str) -> IResult<&str, MshHeader> {
         binary: one_of!("01") >>
         sp >>
         size_t: one_of!("48") >>
+        end_of_line >>
         endian: opt!(
             do_parse!(
-                end_of_line >>
                 // gmsh docs say ascii int = 1 => I assume this means 4 bytes?
                 endianness: take!(4) >>
                 end_of_line >>
                 (Some(endianness))
             )
         ) >>
-        // format_footer >>
+        format_footer >>
         (MshHeader {
             version: match version {
                "2.2" => MshFormat::V22,

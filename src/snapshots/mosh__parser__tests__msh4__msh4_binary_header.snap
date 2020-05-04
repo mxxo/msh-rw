@@ -3,7 +3,7 @@ source: src/parser.rs
 expression: parse_header(&first_four_lines(path).unwrap()).unwrap()
 ---
 (
-    "$EndMeshFormat\n",
+    "",
     MshHeader {
         version: V41,
         storage: BinaryLe,
