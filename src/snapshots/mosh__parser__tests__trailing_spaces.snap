@@ -2,7 +2,7 @@
 source: src/parser.rs
 expression: parse_node_msh2(inp).unwrap().1
 ---
-Point {
+Node {
     tag: 101,
     x: 0.0,
     y: 1.0,

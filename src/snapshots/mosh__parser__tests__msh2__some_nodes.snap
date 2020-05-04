@@ -1,21 +1,21 @@
 ---
 source: src/parser.rs
-expression: parse_node_section_msh2(inp).unwrap().1
+expression: parse_node_section_msh2(i).unwrap().1
 ---
 [
-    Point {
+    Node {
         tag: 1,
         x: 0.0,
         y: 0.0,
         z: 1.0,
     },
-    Point {
+    Node {
         tag: 2,
         x: 1.0,
         y: 1.0,
         z: 1.0,
     },
-    Point {
+    Node {
         tag: 100,
         x: 1.0,
         y: 1.0,

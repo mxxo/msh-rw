@@ -35,7 +35,7 @@ pub struct PhysicalGroup {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Clone, Default)]
 pub struct Msh {
-    pub nodes: Vec<Point>,
+    pub nodes: Vec<Node>,
     pub elts: Vec<MeshElt>,
     pub physical_groups: Vec<PhysicalGroup>,
     // entity blocs -- need to match to nodes
@@ -153,7 +153,7 @@ impl std::fmt::Display for MshSizeT {
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Copy, Clone)]
-pub struct Point {
+pub struct Node {
     pub tag: Tag,
     pub x: f64,
     pub y: f64,
@@ -167,12 +167,14 @@ pub struct MeshElt {
     pub ty: MeshShape,
     pub nodes: Vec<Tag>,
     pub physical_groups: Option<Vec<Tag>>,
+    /// The geometry this element comes from.
+    pub geometry: Option<Tag>,
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Copy, Clone)]
 pub enum MeshShape {
-    Node,
+    Point,
     Line,
     Triangle,
     Quad,
@@ -203,14 +205,15 @@ mod tests {
     fn basic_msh2_ascii() {
         let mut msh = Msh::new();
         msh.nodes = vec![
-            Point { tag: 1, x: 0.0, y: 0.0, z: 0.0, },
-            Point { tag: 2, x: 1.0, y: 0.0, z: 0.0, },
+            Node { tag: 1, x: 0.0, y: 0.0, z: 0.0, },
+            Node { tag: 2, x: 1.0, y: 0.0, z: 0.0, },
         ];
         msh.elts = vec![MeshElt {
                 tag: 1,
                 ty: MeshShape::Line,
                 nodes: vec![1, 2],
                 physical_groups: None,
+                geometry: None,
             }
         ];
         let mut buffer = Vec::new();
@@ -223,14 +226,15 @@ mod tests {
     fn msh_json() {
         let mut msh = Msh::new();
         msh.nodes = vec![
-            Point { tag: 1, x: 0.0, y: 0.0, z: 0.0, },
-            Point { tag: 2, x: 1.0, y: 0.0, z: 0.0, },
+            Node { tag: 1, x: 0.0, y: 0.0, z: 0.0, },
+            Node { tag: 2, x: 1.0, y: 0.0, z: 0.0, },
         ];
         msh.elts = vec![MeshElt {
                 tag: 1,
                 ty: MeshShape::Line,
                 nodes: vec![1, 2],
                 physical_groups: None,
+                geometry: None,
             }
         ];
         assert_display_snapshot!(serde_json::to_string(&msh).unwrap());

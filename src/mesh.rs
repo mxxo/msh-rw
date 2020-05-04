@@ -1,27 +1,27 @@
-use crate::Point;
+use crate::Node;
 
 // pub trait MeshElt?
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Copy, Clone)]
-pub struct Node {
-    point: Point,
+pub struct Point {
+    point: Node,
 }
 
-impl Node {
-    pub fn from_points(p: Point) -> Node {
-        Node { point: p }
+impl Point {
+    pub fn from_points(p: Node) -> Point {
+        Point { point: p }
     }
 }
 
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Copy, Clone)]
 pub struct Line {
-    points: (Point, Point),
+    points: (Node, Node),
 }
 
 impl Line {
-    pub fn from_points(a: Point, b: Point) -> Line {
+    pub fn from_points(a: Node, b: Node) -> Line {
         Line { points: (a, b) }
     }
 }
@@ -29,11 +29,11 @@ impl Line {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Copy, Clone)]
 pub struct Tri {
-    points: (Point, Point, Point),
+    points: (Node, Node, Node),
 }
 
 impl Tri {
-    pub fn from_points(a: Point, b: Point, c: Point) -> Tri {
+    pub fn from_points(a: Node, b: Node, c: Node) -> Tri {
         Tri { points: (a, b, c) }
     }
 }
@@ -41,16 +41,16 @@ impl Tri {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[derive(Debug, Copy, Clone)]
 pub struct Quad {
-    points: (Point, Point, Point, Point),
+    points: (Node, Node, Node, Node),
 }
 
 impl Quad {
-    pub fn from_points(a: Point, b: Point, c: Point, d: Point) -> Option<Quad> {
+    pub fn from_points(a: Node, b: Node, c: Node, d: Node) -> Option<Quad> {
         todo!()
     }
 
     /// Not all point configurations are correct.
-    pub fn from_points_unchecked(a: Point, b: Point, c: Point, d: Point) -> Quad {
+    pub fn from_points_unchecked(a: Node, b: Node, c: Node, d: Node) -> Quad {
         Quad { points: (a, b, c, d) }
     }
 }
@@ -58,5 +58,4 @@ impl Quad {
 #[cfg(test)]
 mod tests {
     use super::*;
-
 }

@@ -140,7 +140,7 @@ fn parse_header(input: &str) -> MshResult<(&str, MshHeader)> {
     }
 }
 
-fn parse_node_section_msh2(input: &str) -> IResult<&str, Vec<Point>> {
+fn parse_node_section_msh2(input: &str) -> IResult<&str, Vec<Node>> {
     let (input, _) = terminated(tag("$Nodes"), end_of_line)(input)?;
     let (input, num_nodes) = terminated(parse_u64, end_of_line)(input)?;
     let (input, (nodes, _)) = many_till(parse_node_msh2, terminated(tag("$EndNodes"), end_of_line))(input)?;
@@ -151,13 +151,13 @@ fn parse_node_section_msh2(input: &str) -> IResult<&str, Vec<Point>> {
     Ok((input, nodes))
 }
 
-fn parse_node_msh2(input: &str) -> IResult<&str, Point> {
+fn parse_node_msh2(input: &str) -> IResult<&str, Node> {
     do_parse!(input,
         tag: parse_u64 >> sp >>
         x: double >> sp >>
         y: double >> sp >>
         z: double >> end_of_line >>
-        ( Point { tag, x, y, z } )
+        ( Node { tag, x, y, z } )
     )
 }
 
@@ -179,7 +179,7 @@ fn parse_physical_group_msh2(input: &str) -> IResult<&str, PhysicalGroup> {
     let (input, _) = sp(input)?;
     let (input, name) = delimited(char('"'), take_until("\""), char('"'))(input)?;
     let (input, _) = end_of_line(input)?;
-    Ok((input, crate::PhysicalGroup { dim, tag, name: name.to_string() }))
+    Ok((input, PhysicalGroup { dim, tag, name: name.to_string() }))
 }
 
 fn parse_dimension(input: &str) -> IResult<&str, Dim> {
@@ -189,6 +189,11 @@ fn parse_dimension(input: &str) -> IResult<&str, Dim> {
 
 fn parse_u64(input: &str) -> IResult<&str, u64> {
     map_res(digit1, u64::from_str)(input)
+}
+
+fn parse_elements_section_msh2(input: &str) -> IResult<&str, Vec<MeshElt>> {
+    let (input, _) = terminated(tag("$Elements"), end_of_line)(input)?;
+    todo!()
 }
 
 #[cfg(test)]
@@ -229,6 +234,15 @@ mod msh2 {
 3 3 "Water-cube"
 2 4 "fuselage"
 $EndPhysicalNames"#).unwrap().1);
+    }
+
+    #[test]
+    fn bad_physical_group_dimension() {
+        let res = parse_physical_group_msh2(&r#"4 1 "Water cube"#);
+        assert!(res.is_err());
+        if let Err(trace) = res {
+            assert_display_snapshot!(trace);
+        }
     }
 
     #[test]
