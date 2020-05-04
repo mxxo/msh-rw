@@ -60,7 +60,10 @@ fn first_four_lines<P: AsRef<Path>>(path: P) -> std::io::Result<String> {
 // -- helper parsers
 
 pub fn sp(input: &str) -> IResult<&str, &str> {
-    tag(" ")(input)
+    use nom::character::complete::multispace0;
+    multispace0(input)
+    //let (input, nodes) = count(parse_u64_sp, num_info as usize)(input)?;
+    //tag(" ")(input)
 }
 
 pub fn tab(input: &str) -> IResult<&str, &str> {
