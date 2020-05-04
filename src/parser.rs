@@ -164,13 +164,12 @@ fn parse_node_msh2(input: &str) -> IResult<&str, Point> {
 fn parse_physical_groups_msh2(input: &str) -> IResult<&str, Vec<PhysicalGroup>> {
     let (input, _) = terminated(tag("$PhysicalNames"), end_of_line)(input)?;
     let (input, num_groups) = terminated(parse_u64, end_of_line)(input)?;
-    //let (input, (nodes, _)) = many_till(parse_node_msh2, terminated(tag("$EndPhysicalNames"), end_of_line))(input)?;
-    //if num_nodes != nodes.len() as u64 {
-    //    // we don't really care if the number doesn't line up for msh2
-    //    eprintln!("warning: node header says {} nodes, but read {}", num_nodes, nodes.len());
-    //}
-    //Ok((input, nodes))
-    todo!()
+    let (input, (groups, _)) = many_till(parse_physical_group_msh2, terminated(tag("$EndPhysicalNames"), end_of_line))(input)?;
+    if num_groups != groups.len() as u64 {
+        // we don't really care if the number doesn't line up for msh2
+        eprintln!("warning: header says {} physical groups, but read {}", num_groups, groups.len());
+    }
+    Ok((input, groups))
 }
 
 fn parse_physical_group_msh2(input: &str) -> IResult<&str, PhysicalGroup> {
@@ -178,7 +177,8 @@ fn parse_physical_group_msh2(input: &str) -> IResult<&str, PhysicalGroup> {
     let (input, _) = sp(input)?;
     let (input, tag) = parse_u64(input)?;
     let (input, _) = sp(input)?;
-    let (input, name) = preceded(char('"'), take_until("\""))(input)?;
+    let (input, name) = delimited(char('"'), take_until("\""), char('"'))(input)?;
+    let (input, _) = end_of_line(input)?;
     Ok((input, crate::PhysicalGroup { dim, tag, name: name.to_string() }))
 }
 
@@ -215,8 +215,20 @@ mod msh2 {
 
     #[test]
     fn pgroup_msh2() {
-        let i = r##"3 1 "Water cube""##;
+        let i = r#"3 1 "Water cube""#;
         assert_debug_snapshot!(parse_physical_group_msh2(i).unwrap().1);
+    }
+
+    #[test]
+    fn pgroups_section() {
+        assert_debug_snapshot!(parse_physical_groups_msh2(
+            &r#"$PhysicalNames
+4
+0 1 "a point"
+0 2 "hi"
+3 3 "Water-cube"
+2 4 "fuselage"
+$EndPhysicalNames"#).unwrap().1);
     }
 
     #[test]
