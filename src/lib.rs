@@ -178,6 +178,22 @@ pub enum MeshShape {
     Line,
     Triangle,
     Quad,
+    Tetrahedron,
+}
+
+impl MeshShape {
+    pub fn from_gmsh_label(label: u8) -> Option<MeshShape> {
+        match label {
+            1 => Some(MeshShape::Line),
+            2 => Some(MeshShape::Triangle),
+            3 => Some(MeshShape::Quad),
+            4 => Some(MeshShape::Tetrahedron),
+            15 => Some(MeshShape::Point),
+            other => {
+                eprintln!("unsupported gmsh element: {}", other); None
+            }
+        }
+    }
 }
 
 #[cfg(test)]
