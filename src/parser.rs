@@ -155,6 +155,16 @@ fn parse_node_section_msh2(input: &str) -> IResult<&str, Vec<Node>> {
     Ok((input, nodes))
 }
 
+fn parse_unknown_section(input: &str) -> IResult<&str, ()> {
+    let (input, section_name) = delimited(char('$'), take_until("\n"), end_of_line)(input)?;
+    eprintln!("skipping unknown section ${}", section_name);
+    // fast-forward to ending line
+    let (input, _) = take_until("$End")(input)?;
+    // skip the ending line and continue
+    let (input, _) = delimited(char('$'), take_until("\n"), end_of_line)(input)?;
+    Ok((input, ()))
+}
+
 fn parse_node_msh2(input: &str) -> IResult<&str, Node> {
     do_parse!(input,
         tag: parse_u64 >> sp >>
@@ -267,6 +277,11 @@ mod tests {
 mod msh2 {
 
     use super::*;
+
+    #[test]
+    fn unknown_section() {
+        assert_debug_snapshot!(parse_unknown_section("$Comments\nhi there\nfinished in 10.2seconds\n$EndComments\n").unwrap().1);
+    }
 
     #[test]
     fn node_elt() {
