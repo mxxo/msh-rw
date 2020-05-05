@@ -35,14 +35,27 @@ impl Msh {
     fn from_file<P: AsRef<Path>>(path: P) -> MshResult<Msh> {
         let (input, header) = parse_header(&first_four_lines(path)?)?;
         //match header {
-        //    todo!();
+        //    todo!()
         //}
-        todo!()
+        todo!();
     }
 }
 
-fn parse_msh2() -> MshResult<Msh> {
-    todo!()
+fn parse_msh2_ascii(input: &str) -> MshResult<Msh> {
+    let mut msh = Msh::new();
+    let mut msh_input = input;
+    while !msh_input.is_empty() {
+        if let Ok((rest, nodes)) = parse_node_section_msh2(msh_input) {
+            msh.nodes = nodes;
+            msh_input = rest;
+        }
+        if let Ok((rest, physical_groups)) = parse_physical_groups_msh2(msh_input) {
+            msh.physical_groups = physical_groups;
+            msh_input = rest;
+        }
+        eprintln!("{}", msh_input);
+    }
+    Ok(msh)
 }
 
 fn first_four_lines<P: AsRef<Path>>(path: P) -> std::io::Result<String> {
@@ -277,6 +290,25 @@ mod tests {
 mod msh2 {
 
     use super::*;
+
+    #[test]
+    fn msh2_ascii() {
+        assert_debug_snapshot!(parse_msh2_ascii(
+            "$Nodes\n\
+            3\n\
+            1 0. 0. 1.\n\
+            2 1. 1 1\n\
+            100 1 1 1\n\
+            $EndNodes\n\
+            $PhysicalNames\n\
+            4\n\
+            0 1 \"a point\"\n\
+            0 2 \"hi\"\n\
+            3 3 \"Water-cube\"\n\
+            2 4 \"fuselage\"\n\
+            $EndPhysicalNames\n"
+        ).unwrap());
+    }
 
     #[test]
     fn unknown_section() {
