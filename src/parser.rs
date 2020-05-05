@@ -3,10 +3,11 @@ use crate::*;
 use thiserror::Error;
 
 use nom::*;
+use nom::branch::alt;
 use nom::bytes::complete::{tag, take_until};
 use nom::combinator::map_res;
 use nom::character::complete::{anychar, char, line_ending, digit1, one_of};
-use nom::multi::many_till;
+use nom::multi::{count, many_till};
 use nom::number::complete::double;
 use nom::error::context;
 use nom::sequence::{delimited, preceded, terminated};
@@ -159,7 +160,7 @@ fn parse_node_msh2(input: &str) -> IResult<&str, Node> {
         tag: parse_u64 >> sp >>
         x: double >> sp >>
         y: double >> sp >>
-        z: double >> end_of_line >>
+        z: double >> sp >>
         ( Node { tag, x, y, z } )
     )
 }
@@ -194,9 +195,61 @@ fn parse_u64(input: &str) -> IResult<&str, u64> {
     map_res(digit1, u64::from_str)(input)
 }
 
+fn parse_u64_sp(input: &str) ->  IResult<&str, u64> {
+    terminated(map_res(digit1, u64::from_str), sp)(input)
+}
+
 fn parse_elements_section_msh2(input: &str) -> IResult<&str, Vec<MeshElt>> {
     let (input, _) = terminated(tag("$Elements"), end_of_line)(input)?;
-    todo!()
+    let (input, num_elts) = terminated(parse_u64, end_of_line)(input)?;
+    let (input, (elts, _)) = many_till(parse_element_msh2, terminated(tag("$EndElements"), end_of_line))(input)?;
+    if num_elts != elts.len() as u64 {
+        // we don't really care if the number doesn't line up for msh2
+        eprintln!("warning: header says {} elements, but read {}", num_elts, elts.len());
+    }
+    Ok((input, elts))
+}
+
+fn parse_element_msh2(input: &str) -> IResult<&str, MeshElt> {
+    let (input, tag) = terminated(parse_u64, sp)(input)?;
+    let (input, label) = terminated(digit1, sp)(input)?;
+    let elt_type = match MeshShape::from_gmsh_label(label) {
+        Some(ty) => ty,
+        None => panic!(format!("unknown mesh element type: {}", label)),
+    };
+
+    let (input, elt_info) = parse_elt_info(input)?;
+    let (input, nodes) = count(parse_u64_sp, elt_type.num_nodes() as usize)(input)?;
+
+    let uint_to_tag = |uint| if uint != 0 { Some(uint) } else { None };
+    Ok((input, MeshElt {
+        tag,
+        ty: elt_type,
+        nodes,
+        // multiple physical groups are handled by duplicate shapes
+        physical_group: uint_to_tag(elt_info.physical_group),
+        geometry: uint_to_tag(elt_info.geometry),
+    }))
+}
+
+struct EltInfo {
+    pub physical_group: Tag,
+    pub geometry: Tag,
+    // lots of options here:
+    // https://gitlab.onelab.info/gmsh/gmsh/-/blob/master/Geo/GModelIO_MSH2.cpp#L370
+    //pub mesh_partition: Option<Tag>,
+    //pub ghost_elements: Option<Vec<Tag>>,
+    //pub domain: Option<(Tag, Tag)>,
+    //pub parent_elt: Option<Tag>,
+}
+
+fn parse_elt_info(input: &str) -> IResult<&str, EltInfo> {
+    let (input, num_info) = parse_u64_sp(input)?;
+    if num_info > 2 {
+        eprintln!("warning: only reading physical group and geometry information and skipping partitions, ghost elements...");
+    }
+    let (input, elt_info) = count(parse_u64_sp, num_info as usize)(input)?;
+    Ok((input, EltInfo { physical_group: elt_info[0], geometry: elt_info[1] }))
 }
 
 #[cfg(test)]
@@ -214,6 +267,31 @@ mod tests {
 mod msh2 {
 
     use super::*;
+
+    #[test]
+    fn node_elt() {
+        assert_debug_snapshot!(parse_element_msh2("1 15 2 0 0 5\n").unwrap().1);
+    }
+
+    #[test]
+    fn line_elt() {
+        assert_debug_snapshot!(parse_element_msh2("500 1 2 1 2 30 31\n").unwrap().1);
+    }
+
+    #[test]
+    fn tri_elt() {
+        assert_debug_snapshot!(parse_element_msh2("10 2 2 5 1 1 2 3\n").unwrap().1);
+    }
+
+    #[test]
+    fn tetra_elt() {
+        assert_debug_snapshot!(parse_element_msh2("41 4 2 0 1 1 2 3 4\n").unwrap().1);
+    }
+
+    #[test]
+    fn elt_extra_fields() {
+        assert_debug_snapshot!(parse_element_msh2("41 4 5 0 1 1 2 3 41 42 43 44\n").unwrap().1);
+    }
 
     #[test]
     fn node_msh2() {

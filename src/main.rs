@@ -10,7 +10,7 @@ fn main() {
             tag: 1,
             ty: MeshShape::Line,
             nodes: vec![1, 2],
-            physical_groups: None,
+            physical_group: None,
             geometry: None,
         }
     ];

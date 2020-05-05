@@ -166,7 +166,8 @@ pub struct MeshElt {
     pub tag: Tag,
     pub ty: MeshShape,
     pub nodes: Vec<Tag>,
-    pub physical_groups: Option<Vec<Tag>>,
+    /// The element's physical group.
+    pub physical_group: Option<Tag>,
     /// The geometry this element comes from.
     pub geometry: Option<Tag>,
 }
@@ -182,16 +183,26 @@ pub enum MeshShape {
 }
 
 impl MeshShape {
-    pub fn from_gmsh_label(label: u8) -> Option<MeshShape> {
+    pub fn from_gmsh_label(label: &str) -> Option<MeshShape> {
         match label {
-            1 => Some(MeshShape::Line),
-            2 => Some(MeshShape::Triangle),
-            3 => Some(MeshShape::Quad),
-            4 => Some(MeshShape::Tetrahedron),
-            15 => Some(MeshShape::Point),
+            "1" => Some(MeshShape::Line),
+            "2" => Some(MeshShape::Triangle),
+            "3" => Some(MeshShape::Quad),
+            "4" => Some(MeshShape::Tetrahedron),
+            "15" => Some(MeshShape::Point),
             other => {
-                eprintln!("unsupported gmsh element: {}", other); None
+                None
             }
+        }
+    }
+
+    pub fn num_nodes(self) -> u8 {
+        match self {
+            MeshShape::Point => 1,
+            MeshShape::Line => 2,
+            MeshShape::Triangle => 3,
+            MeshShape::Quad => 4,
+            MeshShape::Tetrahedron => 4,
         }
     }
 }
@@ -228,7 +239,7 @@ mod tests {
                 tag: 1,
                 ty: MeshShape::Line,
                 nodes: vec![1, 2],
-                physical_groups: None,
+                physical_group: None,
                 geometry: None,
             }
         ];
@@ -249,7 +260,7 @@ mod tests {
                 tag: 1,
                 ty: MeshShape::Line,
                 nodes: vec![1, 2],
-                physical_groups: None,
+                physical_group: None,
                 geometry: None,
             }
         ];
