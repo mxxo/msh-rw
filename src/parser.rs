@@ -5,7 +5,7 @@ use thiserror::Error;
 use nom::*;
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_until};
-use nom::combinator::map_res;
+use nom::combinator::{map_res, cut};
 use nom::character::complete::{anychar, char, line_ending, digit1, one_of};
 use nom::multi::{count, many_till};
 use nom::number::complete::double;
@@ -44,14 +44,30 @@ impl Msh {
 fn parse_msh2_ascii(input: &str) -> MshResult<Msh> {
     let mut msh = Msh::new();
     let mut msh_input = input;
+
     while !msh_input.is_empty() {
-        if let Ok((rest, nodes)) = parse_node_section_msh2(msh_input) {
-            msh.nodes = nodes;
-            msh_input = rest;
+        match parse_node_section_msh2(msh_input) {
+            Ok((rest, nodes)) => { msh.nodes = nodes; msh_input = rest; },
+            Err(err @ Err::Failure(_)) => { return Err(err.to_owned().into()); },
+            Err(_) => { /* keep trying other parsers */ },
         }
-        if let Ok((rest, physical_groups)) = parse_physical_groups_msh2(msh_input) {
-            msh.physical_groups = physical_groups;
-            msh_input = rest;
+        match parse_physical_groups_msh2(msh_input) {
+            Ok((rest, physical_groups)) => {
+                msh.physical_groups = physical_groups;
+                msh_input = rest;
+            },
+            Err(err @ Err::Failure(_)) => { return Err(err.to_owned().into()); },
+            Err(_) => { /* keep trying other parsers */ },
+        }
+        match parse_elements_section_msh2(msh_input) {
+            Ok((rest, elts)) => { msh.elts = elts; msh_input = rest; },
+            Err(err @ Err::Failure(_)) => { return Err(err.to_owned().into()); },
+            Err(_) => { /* keep trying other parsers */ },
+        }
+        match parse_unknown_section(msh_input) {
+            Ok((rest, _)) => msh_input = rest,
+            Err(err @ Err::Failure(_)) => { return Err(err.to_owned().into()); },
+            Err(_) => { /* keep trying other parsers */ },
         }
         eprintln!("{}", msh_input);
     }
@@ -85,7 +101,6 @@ pub fn tab(input: &str) -> IResult<&str, &str> {
 }
 
 pub fn whitespace(input: &str) -> IResult<&str, &str> {
-    use nom::branch::alt;
     alt((sp, tab))(input)
 }
 
@@ -159,7 +174,7 @@ fn parse_header(input: &str) -> MshResult<(&str, MshHeader)> {
 
 fn parse_node_section_msh2(input: &str) -> IResult<&str, Vec<Node>> {
     let (input, _) = terminated(tag("$Nodes"), end_of_line)(input)?;
-    let (input, num_nodes) = terminated(parse_u64, end_of_line)(input)?;
+    let (input, num_nodes) = cut(terminated(parse_u64, end_of_line))(input)?;
     let (input, (nodes, _)) = many_till(parse_node_msh2, terminated(tag("$EndNodes"), end_of_line))(input)?;
     if num_nodes != nodes.len() as u64 {
         // we don't really care if the number doesn't line up for msh2
@@ -190,7 +205,7 @@ fn parse_node_msh2(input: &str) -> IResult<&str, Node> {
 
 fn parse_physical_groups_msh2(input: &str) -> IResult<&str, Vec<PhysicalGroup>> {
     let (input, _) = terminated(tag("$PhysicalNames"), end_of_line)(input)?;
-    let (input, num_groups) = terminated(parse_u64, end_of_line)(input)?;
+    let (input, num_groups) = cut(terminated(parse_u64, end_of_line))(input)?;
     let (input, (groups, _)) = many_till(parse_physical_group_msh2, terminated(tag("$EndPhysicalNames"), end_of_line))(input)?;
     if num_groups != groups.len() as u64 {
         // we don't really care if the number doesn't line up for msh2
@@ -224,7 +239,7 @@ fn parse_u64_sp(input: &str) ->  IResult<&str, u64> {
 
 fn parse_elements_section_msh2(input: &str) -> IResult<&str, Vec<MeshElt>> {
     let (input, _) = terminated(tag("$Elements"), end_of_line)(input)?;
-    let (input, num_elts) = terminated(parse_u64, end_of_line)(input)?;
+    let (input, num_elts) = cut(terminated(parse_u64, end_of_line))(input)?;
     let (input, (elts, _)) = many_till(parse_element_msh2, terminated(tag("$EndElements"), end_of_line))(input)?;
     if num_elts != elts.len() as u64 {
         // we don't really care if the number doesn't line up for msh2
@@ -306,13 +321,34 @@ mod msh2 {
             0 2 \"hi\"\n\
             3 3 \"Water-cube\"\n\
             2 4 \"fuselage\"\n\
-            $EndPhysicalNames\n"
+            $EndPhysicalNames\n\
+            $Elements\n\
+            5\n\
+            1 15 2 0 0 5\n\
+            500 1 2 1 2 30 31\n\
+            10 2 2 5 1 1 2 3\n\
+            41 4 2 0 1 1 2 3 4\n\
+            41 4 5 0 1 1 2 3 41 42 43 44\n\
+            $EndElements\n"
         ).unwrap());
     }
 
     #[test]
     fn unknown_section() {
         assert_debug_snapshot!(parse_unknown_section("$Comments\nhi there\nfinished in 10.2seconds\n$EndComments\n").unwrap().1);
+    }
+
+    #[test]
+    fn section_failure() {
+        // no elt number before listing elts
+        let input =
+            "$Elements\n\
+             1 15 2 0 0 5\n\
+             500 1 2 1 2 30 31\n\
+             $EndElements";
+        let mut msh_input = input;
+        let res = parse_msh2_ascii(msh_input);
+        assert!(res.is_err());
     }
 
     #[test]
