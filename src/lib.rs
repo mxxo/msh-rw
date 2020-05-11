@@ -50,24 +50,18 @@ impl Msh {
         }
     }
 
-    pub fn write_msh2<W: Write>(&self, sink: &mut W, storage: MshStorage) -> io::Result<()> {
-        write!(sink, "{}", MshHeader::v2(storage))?;
+    pub fn write_msh2<W: Write>(&self, sink: &mut W, storage: Storage) -> io::Result<()> {
+        write!(sink, "{}", MshHeader { version: Version::V22, storage })?;
         writeln!(sink, "$Nodes")?;
         writeln!(sink, "{}", self.nodes.len())?;
         for node in &self.nodes {
             match storage {
-                MshStorage::Ascii => writeln!(sink, "{} {} {} {}", node.tag, node.x, node.y, node.z)?,
-                MshStorage::BinaryLe => {
+                Storage::Ascii => writeln!(sink, "{} {} {} {}", node.tag, node.x, node.y, node.z)?,
+                Storage::BinaryLe => {
                     sink.write_all(&node.tag.to_le_bytes())?;
                     sink.write_all(&node.x.to_le_bytes())?;
                     sink.write_all(&node.y.to_le_bytes())?;
                     sink.write_all(&node.z.to_le_bytes())?
-                },
-                MshStorage::BinaryBe => {
-                    sink.write_all(&node.tag.to_be_bytes())?;
-                    sink.write_all(&node.x.to_be_bytes())?;
-                    sink.write_all(&node.y.to_be_bytes())?;
-                    sink.write_all(&node.z.to_be_bytes())?
                 },
             }
         }
@@ -75,79 +69,52 @@ impl Msh {
         Ok(())
     }
 
-    pub fn write_msh4<W: Write>(&self, sink: &mut W, storage: MshStorage) -> io::Result<()> {
-        write!(sink, "{}", MshHeader::v4(storage))?;
+    pub fn write_msh4<W: Write>(&self, sink: &mut W, storage: Storage) -> io::Result<()> {
+        write!(sink, "{}", MshHeader{ version: Version::V41, storage })?;
         Ok(())
     }
+
+    pub fn section(&mut self, s: impl MshSection) {
+        todo!();
+    }
 }
 
-#[derive(Debug, Copy, Clone)]
+pub trait MshSection {
+    fn add_section(self, mesh: &mut Msh);
+}
+
+/// Only `size_t` of 8 bytes is supported (like Gmsh itself).
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub struct MshHeader {
-    pub version: MshFormat,
-    pub storage: MshStorage,
-    pub size_t: MshSizeT,
+    pub version: Version,
+    pub storage: Storage,
 }
 
-impl MshHeader {
-    pub fn v2(storage: MshStorage) -> Self {
-        MshHeader {
-            storage,
-            version: MshFormat::V22,
-            size_t: MshSizeT::EightBytes,
-        }
-    }
-    pub fn v4(storage: MshStorage) -> Self {
-        MshHeader {
-            storage,
-            version: MshFormat::V41,
-            size_t: MshSizeT::EightBytes,
-        }
-    }
-}
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum Version { V22, V41 }
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum Storage { Ascii, BinaryLe }
 
 impl std::fmt::Display for MshHeader {
     fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        use Storage::*;
+        use Version::*;
         writeln!(fmt, "$MeshFormat")?;
-        writeln!(fmt, "{} {} {}", self.version, self.storage, self.size_t)?;
+        let vers = match self.version {
+            V22 => "2.2",
+            V41 => "4.1",
+        };
+        let storage = match self.storage {
+            Ascii => "0",
+            BinaryLe => "1",
+        };
+        writeln!(fmt, "{} {} 8", vers, storage)?;
         match self.storage {
-            MshStorage::BinaryBe => writeln!(fmt, "\u{0}\u{0}\u{0}\u{1}")?,
-            MshStorage::BinaryLe => writeln!(fmt, "\u{1}\u{0}\u{0}\u{0}")?,
-            MshStorage::Ascii => (/* skip */),
+            Ascii => (/* skip */),
+            BinaryLe => writeln!(fmt, "\u{1}\u{0}\u{0}\u{0}")?,
         };
         writeln!(fmt, "$EndMeshFormat")
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum MshStorage { Ascii, BinaryLe, BinaryBe }
-impl std::fmt::Display for MshStorage {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            MshStorage::Ascii => write!(fmt, "0"),
-            MshStorage::BinaryLe | MshStorage::BinaryBe => write!(fmt, "1"),
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum MshFormat { V22, V41 }
-impl std::fmt::Display for MshFormat {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            MshFormat::V22 => write!(fmt, "2.2"),
-            MshFormat::V41 => write!(fmt, "4.1"),
-        }
-    }
-}
-
-#[derive(Debug, Copy, Clone, PartialEq, Eq)]
-pub enum MshSizeT { FourBytes, EightBytes }
-impl std::fmt::Display for MshSizeT {
-    fn fmt(&self, fmt: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        match self {
-            MshSizeT::FourBytes => write!(fmt, "4"),
-            MshSizeT::EightBytes => write!(fmt, "8"),
-        }
     }
 }
 
@@ -216,7 +183,7 @@ mod tests {
     fn write_empty_msh2_ascii() {
         let mut buffer = Vec::new();
         let msh = Msh::new();
-        msh.write_msh2(&mut buffer, MshStorage::Ascii).unwrap();
+        msh.write_msh2(&mut buffer, Storage::Ascii).unwrap();
         assert_debug_snapshot!(String::from_utf8(buffer).unwrap());
     }
 
@@ -224,7 +191,7 @@ mod tests {
     fn write_empty_msh4_ascii() {
         let mut buffer = Vec::new();
         let msh = Msh::new();
-        msh.write_msh4(&mut buffer, MshStorage::Ascii).unwrap();
+        msh.write_msh4(&mut buffer, Storage::Ascii).unwrap();
         assert_debug_snapshot!(String::from_utf8(buffer).unwrap());
     }
 
@@ -244,7 +211,7 @@ mod tests {
             }
         ];
         let mut buffer = Vec::new();
-        msh.write_msh2(&mut buffer, MshStorage::Ascii).unwrap();
+        msh.write_msh2(&mut buffer, Storage::Ascii).unwrap();
         assert_debug_snapshot!(String::from_utf8(buffer).unwrap());
     }
 

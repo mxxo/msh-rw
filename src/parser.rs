@@ -5,7 +5,7 @@ use thiserror::Error;
 use nom::*;
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_until};
-use nom::combinator::{map_res, cut};
+use nom::combinator::{map_res, cut, peek};
 use nom::character::complete::{anychar, char, line_ending, digit1, one_of};
 use nom::multi::{count, many_till};
 use nom::number::complete::double;
@@ -74,6 +74,10 @@ fn parse_msh2_ascii(input: &str) -> MshResult<Msh> {
     Ok(msh)
 }
 
+fn peek_header() {
+    todo!();
+}
+
 fn first_four_lines<P: AsRef<Path>>(path: P) -> std::io::Result<String> {
     use std::io::BufRead;
     // examine first 3-4 lines, instead of reading the whole file
@@ -130,7 +134,7 @@ pub fn mesh_header(input: &str) -> IResult<&str, MshHeader> {
         sp >>
         binary: one_of!("01") >>
         sp >>
-        size_t: one_of!("48") >>
+        size_t: char!('8') >>
         end_of_line >>
         endian: opt!(
             do_parse!(
@@ -143,23 +147,19 @@ pub fn mesh_header(input: &str) -> IResult<&str, MshHeader> {
         format_footer >>
         (MshHeader {
             version: match version {
-               "2.2" => MshFormat::V22,
-               "4.1" => MshFormat::V41,
+               "2.2" => Version::V22,
+               "4.1" => Version::V41,
                _ => panic!(format!("bad version in mesh header: {}", version)),
             },
             storage: match binary {
-                '0' => MshStorage::Ascii,
+                '0' => Storage::Ascii,
                 '1' => match endian.unwrap() {
                     None => panic!("binary header missing endianness"),
-                    Some("\u{1}\u{0}\u{0}\u{0}") => MshStorage::BinaryLe,
-                    Some(_) => {MshStorage::BinaryBe},
+                    Some("\u{1}\u{0}\u{0}\u{0}") => Storage::BinaryLe,
+                    Some("\u{0}\u{0}\u{0}\u{1}") => panic!("big-endian msh files are unsupported"),
+                    Some(bytes) => panic!(format!("bad endianness bytes: {}, expected \u{1}\u{0}\u{0}\u{0}", bytes)),
                 }
                 _ => panic!(format!("bad storage flag {}, expected 0 (ascii) or 1 (binary)", binary)),
-            },
-            size_t: match size_t {
-                '4' => MshSizeT::FourBytes,
-                '8' => MshSizeT::EightBytes,
-                _ => panic!(format!("bad size_t value: {}", size_t)),
             },
         })
     )
