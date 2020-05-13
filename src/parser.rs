@@ -53,20 +53,22 @@ fn parse_msh2_ascii(input: &str) -> MshResult<Msh> {
     let mut msh = Msh::new();
     let mut msh_input = input;
 
-    while !msh_input.is_empty() {
-        // check here for new mesh files?
-        // push back to vector
-        match peek_section(msh_input) {
-            Ok((input, section)) => {
-                match add_section(&mut msh, section, input) {
-                    Ok((rest, _)) => msh_input = rest,
-                    Err(err) => return Err(err.to_owned().into()),
-                }
-            },
+    while let Ok((input, section)) = peek_section(msh_input) {
+        match add_section(&mut msh, section, input) {
+            Ok((rest, _)) => msh_input = rest,
             Err(err) => return Err(err.to_owned().into()),
         }
     }
     Ok(msh)
+}
+
+/// Returns a vector of meshes, since two or more concatenated msh files are also a valid msh file.
+pub fn parse_msh_file(input: &str) -> MshResult<Vec<Msh>> {
+    let mut msh_input = input;
+//    while !msh_input.is_empty() {
+//
+//    }
+    todo!()
 }
 
 fn peek_header() {
