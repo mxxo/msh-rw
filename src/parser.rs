@@ -41,41 +41,93 @@ impl Msh {
     }
 }
 
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum Msh2Section {
+    Nodes,
+    Elements,
+    PhysicalGroups,
+    Unknown,
+}
+
 fn parse_msh2_ascii(input: &str) -> MshResult<Msh> {
     let mut msh = Msh::new();
     let mut msh_input = input;
 
     while !msh_input.is_empty() {
-        match parse_node_section_msh2(msh_input) {
-            Ok((rest, nodes)) => { msh.nodes = nodes; msh_input = rest; },
-            Err(err @ Err::Failure(_)) => { return Err(err.to_owned().into()); },
-            Err(_) => { /* keep trying other parsers */ },
-        }
-        match parse_physical_groups_msh2(msh_input) {
-            Ok((rest, physical_groups)) => {
-                msh.physical_groups = physical_groups;
-                msh_input = rest;
+        // check here for new mesh files?
+        // push back to vector
+        match peek_section(msh_input) {
+            Ok((input, section)) => {
+                match add_section(&mut msh, section, input) {
+                    Ok((rest, _)) => msh_input = rest,
+                    Err(err) => return Err(err.to_owned().into()),
+                }
             },
-            Err(err @ Err::Failure(_)) => { return Err(err.to_owned().into()); },
-            Err(_) => { /* keep trying other parsers */ },
+            Err(err) => return Err(err.to_owned().into()),
         }
-        match parse_elements_section_msh2(msh_input) {
-            Ok((rest, elts)) => { msh.elts = elts; msh_input = rest; },
-            Err(err @ Err::Failure(_)) => { return Err(err.to_owned().into()); },
-            Err(_) => { /* keep trying other parsers */ },
-        }
-        match parse_unknown_section(msh_input) {
-            Ok((rest, _)) => msh_input = rest,
-            Err(err @ Err::Failure(_)) => { return Err(err.to_owned().into()); },
-            Err(_) => { /* keep trying other parsers */ },
-        }
-        eprintln!("{}", msh_input);
     }
     Ok(msh)
 }
 
 fn peek_header() {
     todo!();
+}
+
+fn peek_section(input: &str) -> IResult<&str, Msh2Section> {
+    peek(alt((
+        nodes_header,
+        elements_header,
+        physical_groups_header,
+    )))(input)
+}
+
+fn add_section<'a>(mesh: &mut Msh, section: Msh2Section, input: &'a str) -> IResult<&'a str, ()> {
+    use Msh2Section::*;
+    match section {
+        Nodes => {
+            let (rest, nodes) = parse_node_section_msh2(input)?;
+            mesh.nodes = nodes;
+            Ok((rest, ()))
+        },
+        Elements => {
+            let (rest, elts) = parse_elements_section_msh2(input)?;
+            mesh.elts = elts;
+            Ok((rest, ()))
+        }
+        PhysicalGroups => {
+            let (rest, pgs) = parse_physical_groups_msh2(input)?;
+            mesh.physical_groups = pgs;
+            Ok((rest, ()))
+        }
+        _ => todo!(),
+    }
+}
+
+#[test]
+fn peek_sections() {
+    assert!(peek_section("$Nodes").unwrap().1 == Msh2Section::Nodes);
+    assert!(peek_section("$Elements").unwrap().1 == Msh2Section::Elements);
+}
+
+fn nodes_header(input: &str) -> IResult<&str, Msh2Section> {
+    let (input, _) = terminated(tag("$Nodes"), end_of_line)(input)?;
+    Ok((input, Msh2Section::Nodes))
+}
+
+fn elements_header(input: &str) -> IResult<&str, Msh2Section> {
+    let (input, _) = terminated(tag("$Elements"), end_of_line)(input)?;
+    Ok((input, Msh2Section::Elements))
+}
+
+fn physical_groups_header(input: &str) -> IResult<&str, Msh2Section> {
+    let (input, _) = terminated(tag("$PhysicalNames"), end_of_line)(input)?;
+    Ok((input, Msh2Section::PhysicalGroups))
+}
+
+#[test]
+fn headers() {
+    assert!(nodes_header("$Nodes").unwrap().1 == Msh2Section::Nodes);
+    assert!(elements_header("$Elements").unwrap().1 == Msh2Section::Elements);
 }
 
 fn first_four_lines<P: AsRef<Path>>(path: P) -> std::io::Result<String> {

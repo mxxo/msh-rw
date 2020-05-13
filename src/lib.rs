@@ -73,14 +73,6 @@ impl Msh {
         write!(sink, "{}", MshHeader{ version: Version::V41, storage })?;
         Ok(())
     }
-
-    pub fn section(&mut self, s: impl MshSection) {
-        todo!();
-    }
-}
-
-pub trait MshSection {
-    fn add_section(self, mesh: &mut Msh);
 }
 
 /// Only `size_t` of 8 bytes is supported (like Gmsh itself).
