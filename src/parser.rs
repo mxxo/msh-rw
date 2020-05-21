@@ -6,7 +6,7 @@ use nom::*;
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_until};
 use nom::combinator::{map_res, cut, peek};
-use nom::character::complete::{anychar, char, line_ending, digit1, one_of};
+use nom::character::complete::{anychar, char, line_ending, digit1, one_of, space0, space1};
 use nom::multi::{count, many_till};
 use nom::number::complete::double;
 use nom::error::context;
@@ -49,30 +49,56 @@ pub enum Msh2Section {
     Unknown,
 }
 
-fn parse_msh2_ascii(input: &str) -> MshResult<Msh> {
+fn parse_msh2_ascii(input: &str) -> IResult<&str, Msh> {
+    let (input, _) = msh2_ascii_header(input)?;
     let mut msh = Msh::new();
     let mut msh_input = input;
-
     while let Ok((input, section)) = peek_section(msh_input) {
-        match add_section(&mut msh, section, input) {
-            Ok((rest, _)) => msh_input = rest,
+        let (rest, _) = add_section(&mut msh, section, input)?;
+        msh_input = rest;
+    }
+    Ok((msh_input, msh))
+}
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+pub enum MshVersion {
+    AsciiV22,
+    AsciiV41,
+    BinaryLeV22,
+    BinaryLeV41,
+}
+
+// careful about input types here! might need to take a &[u8] slice and convert
+// to string for ascii formats.
+pub fn parse_single_msh(input: &str, header: MshVersion) -> IResult<&str, Msh> {
+    match header {
+        MshVersion::AsciiV22 => parse_msh2_ascii(input),
+        MshVersion::AsciiV41 => todo!(),
+        MshVersion::BinaryLeV22 => todo!(),
+        MshVersion::BinaryLeV41 => todo!(),
+    }
+}
+
+/// Returns a vector of meshes, since two or more concatenated `msh` files are also a valid `msh` file.
+pub fn parse_msh_file(input: &str) -> MshResult<Vec<Msh>> {
+    let mut msh_input = input;
+    let mut meshes = Vec::new();
+
+    while let Ok((input, header)) = peek_header(msh_input) {
+        match parse_single_msh(input, header) {
+            Ok((rest, msh)) => { meshes.push(msh); msh_input = rest },
             Err(err) => return Err(err.to_owned().into()),
         }
     }
-    Ok(msh)
+
+    Ok(meshes)
 }
 
-/// Returns a vector of meshes, since two or more concatenated msh files are also a valid msh file.
-pub fn parse_msh_file(input: &str) -> MshResult<Vec<Msh>> {
-    let mut msh_input = input;
-//    while !msh_input.is_empty() {
-//
-//    }
-    todo!()
-}
-
-fn peek_header() {
-    todo!();
+fn peek_header(input: &str) -> IResult<&str, MshVersion> {
+    peek(alt((
+        msh2_ascii_header,
+        msh4_ascii_header,
+    )))(input)
 }
 
 fn peek_section(input: &str) -> IResult<&str, Msh2Section> {
@@ -178,6 +204,37 @@ pub fn format_header(input: &str) -> IResult<&str, &str> {
 
 pub fn format_footer(input: &str) -> IResult<&str, &str> {
     terminated(tag("$EndMeshFormat"), end_of_line)(input)
+}
+
+pub fn msh2_ascii_header(input: &str) -> IResult<&str, MshVersion> {
+    let ((input, _)) = format_header(input)?;
+    let ((input, _)) = terminated(tag("2.2 0 8"), end_of_line)(input)?;
+    let ((input, _)) = format_footer(input)?;
+    Ok((input, MshVersion::AsciiV22))
+}
+
+pub fn msh4_ascii_header(input: &str) -> IResult<&str, MshVersion> {
+    let ((input, _)) = format_header(input)?;
+    let ((input, _)) = terminated(tag("4.1 0 8"), end_of_line)(input)?;
+    let ((input, _)) = format_footer(input)?;
+    Ok((input, MshVersion::AsciiV41))
+}
+
+pub fn msh_header(input: &[u8]) -> IResult<&[u8], MshVersion> {
+    let (input, _) = terminated(tag("$MeshFormat"), line_ending)(input)?;
+    let (input, version) = terminated(alt((tag("2.2"), tag("4.1"))), space1)(input)?;
+    let (input, binary) = terminated(one_of("01"), space1)(input)?;
+    let (input, _size_t) = terminated(char('8'), terminated(space0, line_ending))(input)?;
+    if binary == '1' {
+        todo!()
+     //   endianness: take!(4) >>
+    }
+    let (input, _) = terminated(tag("$EndMeshFormat"), line_ending)(input)?;
+    match (version, binary) {
+        (b"2.2", '0') => Ok((input, MshVersion::AsciiV22)),
+        (b"2.2", '1') => Ok((input, MshVersion::BinaryLeV22)),
+        _ => Err(Err::Error((input, nom::error::ErrorKind::Tag))), //m::error::make_error(input, nom::error::ErrorKind::Tag),
+    }
 }
 
 /// Parse a `msh` file header.
@@ -362,29 +419,16 @@ mod msh2 {
 
     #[test]
     fn msh2_ascii() {
-        assert_debug_snapshot!(parse_msh2_ascii(
-            "$Nodes\n\
-            3\n\
-            1 0. 0. 1.\n\
-            2 1. 1 1\n\
-            100 1 1 1\n\
-            $EndNodes\n\
-            $PhysicalNames\n\
-            4\n\
-            0 1 \"a point\"\n\
-            0 2 \"hi\"\n\
-            3 3 \"Water-cube\"\n\
-            2 4 \"fuselage\"\n\
-            $EndPhysicalNames\n\
-            $Elements\n\
-            5\n\
-            1 15 2 0 0 5\n\
-            500 1 2 1 2 30 31\n\
-            10 2 2 5 1 1 2 3\n\
-            41 4 2 0 1 1 2 3 4\n\
-            41 4 5 0 1 1 2 3 41 42 43 44\n\
-            $EndElements\n"
-        ).unwrap());
+        let msh = std::fs::read_to_string("props/v2/basic.msh").unwrap();
+        assert_debug_snapshot!(parse_msh2_ascii(&msh).unwrap().1);
+    }
+
+    #[test]
+    fn concatenated_mesh_files() {
+        // add basic mesh to itself and make sure the copies match
+        let mut msh = std::fs::read_to_string("props/v2/basic.msh").unwrap();
+        let msh = msh.clone() + &msh;
+        assert_debug_snapshot!(parse_msh_file(&msh).unwrap());
     }
 
     #[test]
