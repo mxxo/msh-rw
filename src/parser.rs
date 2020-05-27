@@ -4,7 +4,7 @@ use thiserror::Error;
 
 use nom::*;
 use nom::branch::alt;
-use nom::bytes::complete::{tag, take_until};
+use nom::bytes::complete::{tag, take, take_until};
 use nom::combinator::{map_res, cut, peek};
 use nom::character::complete::{anychar, char, line_ending, digit1, one_of, space0, space1};
 use nom::multi::{count, many_till};
@@ -224,64 +224,75 @@ pub fn msh_header(input: &[u8]) -> IResult<&[u8], MshVersion> {
     let (input, _) = terminated(tag("$MeshFormat"), line_ending)(input)?;
     let (input, version) = terminated(alt((tag("2.2"), tag("4.1"))), space1)(input)?;
     let (input, binary) = terminated(one_of("01"), space1)(input)?;
-    let (input, _size_t) = terminated(char('8'), terminated(space0, line_ending))(input)?;
+    let (mut input, _size_t) = terminated(char('8'), terminated(space0, line_ending))(input)?;
     if binary == '1' {
-        todo!()
-     //   endianness: take!(4) >>
+        let (inner_input, endianness) = terminated(take(4usize), line_ending)(input)?;
+        match endianness {
+            [1, 0, 0, 0] => (),
+            [0, 0, 0, 1] => {
+                eprintln!("big-endian files are not supported");
+                return Err(Err::Error((input, nom::error::ErrorKind::Tag)));
+            },
+            _ => panic!("bad endianness byte sequence"),
+        }
+        // update parser position in outer scope
+        input = inner_input;
     }
     let (input, _) = terminated(tag("$EndMeshFormat"), line_ending)(input)?;
     match (version, binary) {
         (b"2.2", '0') => Ok((input, MshVersion::AsciiV22)),
         (b"2.2", '1') => Ok((input, MshVersion::BinaryLeV22)),
-        _ => Err(Err::Error((input, nom::error::ErrorKind::Tag))), //m::error::make_error(input, nom::error::ErrorKind::Tag),
+        (b"4.1", '0') => Ok((input, MshVersion::AsciiV41)),
+        (b"4.1", '1') => Ok((input, MshVersion::BinaryLeV41)),
+        _ => Err(Err::Error((input, nom::error::ErrorKind::Tag))),
     }
 }
 
-/// Parse a `msh` file header.
-pub fn mesh_header(input: &str) -> IResult<&str, MshHeader> {
-    do_parse!(input,
-        format_header >>
-        version: alt!(tag!("2.2") | tag!("4.1")) >>
-        sp >>
-        binary: one_of!("01") >>
-        sp >>
-        size_t: char!('8') >>
-        end_of_line >>
-        endian: opt!(
-            do_parse!(
-                // gmsh docs say ascii int = 1 => I assume this means 4 bytes?
-                endianness: take!(4) >>
-                end_of_line >>
-                (Some(endianness))
-            )
-        ) >>
-        format_footer >>
-        (MshHeader {
-            version: match version {
-               "2.2" => Version::V22,
-               "4.1" => Version::V41,
-               _ => panic!(format!("bad version in mesh header: {}", version)),
-            },
-            storage: match binary {
-                '0' => Storage::Ascii,
-                '1' => match endian.unwrap() {
-                    None => panic!("binary header missing endianness"),
-                    Some("\u{1}\u{0}\u{0}\u{0}") => Storage::BinaryLe,
-                    Some("\u{0}\u{0}\u{0}\u{1}") => panic!("big-endian msh files are unsupported"),
-                    Some(bytes) => panic!(format!("bad endianness bytes: {}, expected \u{1}\u{0}\u{0}\u{0}", bytes)),
-                }
-                _ => panic!(format!("bad storage flag {}, expected 0 (ascii) or 1 (binary)", binary)),
-            },
-        })
-    )
-}
+///// Parse a `msh` file header.
+//pub fn mesh_header(input: &str) -> IResult<&str, MshHeader> {
+//    do_parse!(input,
+//        format_header >>
+//        version: alt!(tag!("2.2") | tag!("4.1")) >>
+//        sp >>
+//        binary: one_of!("01") >>
+//        sp >>
+//        size_t: char!('8') >>
+//        end_of_line >>
+//        endian: opt!(
+//            do_parse!(
+//                // gmsh docs say ascii int = 1 => I assume this means 4 bytes?
+//                endianness: take!(4) >>
+//                end_of_line >>
+//                (Some(endianness))
+//            )
+//        ) >>
+//        format_footer >>
+//        (MshHeader {
+//            version: match version {
+//               "2.2" => Version::V22,
+//               "4.1" => Version::V41,
+//               _ => panic!(format!("bad version in mesh header: {}", version)),
+//            },
+//            storage: match binary {
+//                '0' => Storage::Ascii,
+//                '1' => match endian.unwrap() {
+//                    None => panic!("binary header missing endianness"),
+//                    Some("\u{1}\u{0}\u{0}\u{0}") => Storage::BinaryLe,
+//                    Some("\u{0}\u{0}\u{0}\u{1}") => panic!("big-endian msh files are unsupported"),
+//                    Some(bytes) => panic!(format!("bad endianness bytes: {}, expected \u{1}\u{0}\u{0}\u{0}", bytes)),
+//                }
+//                _ => panic!(format!("bad storage flag {}, expected 0 (ascii) or 1 (binary)", binary)),
+//            },
+//        })
+//    )
+//}
 
-fn parse_header(input: &str) -> MshResult<(&str, MshHeader)> {
-    match mesh_header(input) {
-        Ok(res) => Ok(res),
-        Err(e) => Err(e.to_owned().into()),
-    }
-}
+//fn parse_header(input: &str) -> MshResult<(&str, MshHeader)> {
+//    match mesh_header(input) {
+//        Ok(res) => Ok(res),
+//        Err(e) => Err(e.to_owned().into()),
+//    }
+//}
 
 fn parse_node_section_msh2(input: &str) -> IResult<&str, Vec<Node>> {
     let (input, _) = terminated(tag("$Nodes"), end_of_line)(input)?;
@@ -523,6 +534,20 @@ $EndPhysicalNames"#).unwrap().1);
     fn empty_nodes() {
         let inp = "$Nodes\n0\n$EndNodes\n";
         assert_debug_snapshot!(parse_node_section_msh2(inp).unwrap().1);
+    }
+
+    #[test]
+    fn msh_header_test() {
+        let header = "$MeshFormat\n2.2 0 8\n$EndMeshFormat\n";
+        match msh_header(header.as_bytes()) {
+            Ok((_, MshVersion::AsciiV22)) => (),
+            _else => {std::dbg!(_else); panic!("bad mesh header")},
+        };
+        let header = "$MeshFormat\n2.2 1 8\n\u{1}\u{0}\u{0}\u{0}\n$EndMeshFormat\n";
+        match msh_header(header.as_bytes()) {
+            Ok((_, MshVersion::BinaryLeV22)) => (),
+            _else => {std::dbg!(_else); panic!("bad mesh header")},
+        };
     }
 
     #[test]
