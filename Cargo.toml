@@ -9,6 +9,7 @@ exclude = ["props", "src/snapshots"]
 nom = "5.1.1"
 thiserror = "1.0.15"
 serde = { version = "1.0", optional = true, features = ["derive"] }
+bstr = "0.2.13"
 
 [dev-dependencies]
 insta = "0.16.0"

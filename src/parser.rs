@@ -12,6 +12,8 @@ use nom::number::complete::double;
 use nom::error::context;
 use nom::sequence::{delimited, preceded, terminated};
 
+use bstr::ByteSlice;
+
 use std::path::Path;
 use std::str::FromStr;
 
