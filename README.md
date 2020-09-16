@@ -1,4 +1,6 @@
 # `msh-rw`
+[![msh-rw](https://docs.rs/msh-rw/badge.svg)](https://docs.rs/msh-rw/)
+
 Read and write Gmsh `msh` files
 
 ⚠️ This library is in an alpha state ⚠️
