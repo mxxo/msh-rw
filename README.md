@@ -1,7 +1,7 @@
 # `msh-rw`
 Read and write Gmsh `msh` files
 
-⚠️T This library is in an alpha state ⚠️
+⚠️ This library is in an alpha state ⚠️
 
 The minimum supported `rustc` version is `1.40.0`.
 
