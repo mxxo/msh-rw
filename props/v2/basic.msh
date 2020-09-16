@@ -1,0 +1,24 @@
+$MeshFormat
+2.2 0 8
+$EndMeshFormat
+$Nodes
+3
+1 0. 0. 1.
+2 1. 1 1
+100 1 1 1
+$EndNodes
+$PhysicalNames
+4
+0 1 "a point"
+0 2 "hi"
+3 3 "Water-cube"
+2 4 "fuselage"
+$EndPhysicalNames
+$Elements
+5
+1 15 2 0 0 5
+500 1 2 1 2 30 31
+10 2 2 5 1 1 2 3
+41 4 2 0 1 1 2 3 4
+41 4 5 0 1 1 2 3 41 42 43 44
+$EndElements
