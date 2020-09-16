@@ -5,6 +5,9 @@ description = "Read and write Gmsh msh files"
 authors = ["Max Orok <maxwellorok@gmail.com>"]
 edition = "2018"
 exclude = ["props", "src/snapshots"]
+repository = "https://github.com/mxxo/msh-rw"
+license = "MIT OR Apache-2.0"
+
 
 [dependencies]
 nom = "5.1.1"
