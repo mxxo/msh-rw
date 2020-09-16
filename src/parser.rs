@@ -35,7 +35,7 @@ pub type MshResult<T> = std::result::Result<T, MshError>;
 
 impl Msh {
     fn from_file<P: AsRef<Path>>(path: P) -> MshResult<Msh> {
-        let (input, header) = parse_header(&first_four_lines(path)?)?;
+        let (input, header) = msh_header(&first_four_lines(path)?.as_bytes()).unwrap();
         //match header {
         //    todo!()
         //}
@@ -249,52 +249,6 @@ pub fn msh_header(input: &[u8]) -> IResult<&[u8], MshVersion> {
         _ => Err(Err::Error((input, nom::error::ErrorKind::Tag))),
     }
 }
-
-///// Parse a `msh` file header.
-//pub fn mesh_header(input: &str) -> IResult<&str, MshHeader> {
-//    do_parse!(input,
-//        format_header >>
-//        version: alt!(tag!("2.2") | tag!("4.1")) >>
-//        sp >>
-//        binary: one_of!("01") >>
-//        sp >>
-//        size_t: char!('8') >>
-//        end_of_line >>
-//        endian: opt!(
-//            do_parse!(
-//                // gmsh docs say ascii int = 1 => I assume this means 4 bytes?
-//                endianness: take!(4) >>
-//                end_of_line >>
-//                (Some(endianness))
-//            )
-//        ) >>
-//        format_footer >>
-//        (MshHeader {
-//            version: match version {
-//               "2.2" => Version::V22,
-//               "4.1" => Version::V41,
-//               _ => panic!(format!("bad version in mesh header: {}", version)),
-//            },
-//            storage: match binary {
-//                '0' => Storage::Ascii,
-//                '1' => match endian.unwrap() {
-//                    None => panic!("binary header missing endianness"),
-//                    Some("\u{1}\u{0}\u{0}\u{0}") => Storage::BinaryLe,
-//                    Some("\u{0}\u{0}\u{0}\u{1}") => panic!("big-endian msh files are unsupported"),
-//                    Some(bytes) => panic!(format!("bad endianness bytes: {}, expected \u{1}\u{0}\u{0}\u{0}", bytes)),
-//                }
-//                _ => panic!(format!("bad storage flag {}, expected 0 (ascii) or 1 (binary)", binary)),
-//            },
-//        })
-//    )
-//}
-
-//fn parse_header(input: &str) -> MshResult<(&str, MshHeader)> {
-//    match mesh_header(input) {
-//        Ok(res) => Ok(res),
-//        Err(e) => Err(e.to_owned().into()),
-//    }
-//}
 
 fn parse_node_section_msh2(input: &str) -> IResult<&str, Vec<Node>> {
     let (input, _) = terminated(tag("$Nodes"), end_of_line)(input)?;
@@ -558,7 +512,7 @@ $EndPhysicalNames"#).unwrap().1);
         path.push("props");
         path.push("v2");
         path.push("empty.msh");
-        assert_debug_snapshot!(parse_header(&first_four_lines(path).unwrap()).unwrap());
+        assert_debug_snapshot!(msh_header(&first_four_lines(path).unwrap().as_bytes()).unwrap());
     }
 
     #[test]
@@ -567,7 +521,7 @@ $EndPhysicalNames"#).unwrap().1);
         path.push("props");
         path.push("v2");
         path.push("unix-empty.msh");
-        assert_debug_snapshot!(parse_header(&first_four_lines(path).unwrap()).unwrap());
+        assert_debug_snapshot!(msh_header(&first_four_lines(path).unwrap().as_bytes()).unwrap());
     }
 
     #[test]
@@ -576,7 +530,7 @@ $EndPhysicalNames"#).unwrap().1);
         path.push("props");
         path.push("v2");
         path.push("empty-bin.msh");
-        assert_debug_snapshot!(parse_header(&first_four_lines(path).unwrap()).unwrap());
+        assert_debug_snapshot!(msh_header(&first_four_lines(path).unwrap().as_bytes()).unwrap());
     }
 
     #[test]
@@ -586,7 +540,7 @@ $EndPhysicalNames"#).unwrap().1);
         path.push("v2");
         path.push("bad-header.msh");
         let header_str = first_four_lines(path).unwrap();
-        let res = parse_header(&header_str);
+        let res = msh_header(&header_str.as_bytes());
         assert!(res.is_err());
         if let Err(trace) = res {
             assert_display_snapshot!(trace);
@@ -603,7 +557,7 @@ mod msh4 {
         path.push("props");
         path.push("v4");
         path.push("empty.msh");
-        assert_debug_snapshot!(parse_header(&first_four_lines(path).unwrap()).unwrap());
+        assert_debug_snapshot!(msh_header(&first_four_lines(path).unwrap().as_bytes()).unwrap());
     }
 
     #[test]
@@ -612,14 +566,7 @@ mod msh4 {
         path.push("props");
         path.push("v4");
         path.push("empty-bin.msh");
-        assert_debug_snapshot!(parse_header(&first_four_lines(path).unwrap()).unwrap());
+        assert_debug_snapshot!(msh_header(&first_four_lines(path).unwrap().as_bytes()).unwrap());
     }
-    //#[test]
-    //fn empty_mesh() {
-    //    let mut path = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-    //    path.push("props");
-    //    path.push("empty.msh");
-    //    Msh::from_file(&path).unwrap();
-    //}
 }
 }
