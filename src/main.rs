@@ -1,4 +1,4 @@
-use msh_reader::*;
+use msh_rw::*;
 
 fn main() {
     let mut msh = Msh::new();
