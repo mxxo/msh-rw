@@ -3,20 +3,17 @@
 
 Read and write Gmsh `msh` files
 
-⚠️ This library is in an alpha state ⚠️
+⚠️ This library is in alpha ⚠️
 
 The minimum supported `rustc` version is `1.40.0`.
 
-# Supported versions
+## Supported versions
 * `msh` 2.2 ascii (WIP)
 
-# Planned
+## Planned
 * `msh` 2.2 (binary)
 * `msh` 4.1 (ascii)
-* `msh` 4.1 (ascii)
-
-### Ideas
-Check out `itoa`, `dtoa` to see if they make a noticable difference. 
+* `msh` 4.1 (binary)
 
 ### `serde` integration 
 Enable `serde` support with
@@ -26,3 +23,6 @@ Enable `serde` support with
 Run the `serde` tests with 
 
 `cargo test --features serde`
+
+### Ideas for later
+Check out `itoa`, `dtoa` to see if they make a noticable difference. 
